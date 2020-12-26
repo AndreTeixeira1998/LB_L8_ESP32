@@ -2,14 +2,6 @@
 
 #include "os.h"
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/queue.h"
-#include "freertos/task.h"
-#include "freertos/timers.h"
-#include "freertos/semphr.h"
-#include "freertos/event_groups.h"
-#include "esp_freertos_hooks.h"
-
 #include "mlink.h"
 #include "mwifi.h"
 #include "mdf_common.h"
@@ -88,7 +80,7 @@ void devDriverBussiness_scnarioSwitch_dataParam_save(stt_scenarioSwitchData_nvsO
 	}
 }
 
-static void devDriverBussiness_scnarioSwitch_bussinessDataReq(uint8_t dstMac[6], uint8_t opreatVal){
+static void devDriverBussiness_scnarioSwitch_bussinessDataReq(uint8_t dstMac[MWIFI_ADDR_LEN], uint8_t opreatVal){
 
 	mdf_err_t ret = MDF_OK;
 	
@@ -103,6 +95,10 @@ static void devDriverBussiness_scnarioSwitch_bussinessDataReq(uint8_t dstMac[6],
 	};
 
 	uint8_t meshDatsRequest_temp[2] = {0};
+	uint8_t devSelfMac[MWIFI_ADDR_LEN] = {0};
+
+	esp_wifi_get_mac(ESP_IF_WIFI_STA, devSelfMac);
+	if(!memcmp(devSelfMac, dstMac, sizeof(uint8_t) * MWIFI_ADDR_LEN))return; //拒绝自己调用自己
 
 	meshDatsRequest_temp[0] = L8DEV_MESH_CMD_SCENARIO_CTRL;
 	meshDatsRequest_temp[1] = opreatVal;

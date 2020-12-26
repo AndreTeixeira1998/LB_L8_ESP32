@@ -24,6 +24,13 @@ extern "C" {
 /**********************
  *      TYPEDEFS
  **********************/
+typedef struct{
+
+   uint16_t tH;
+   uint8_t	tM;
+   uint8_t	tS;
+}stt_timeFormatDisp;
+
 typedef union{
 
 	struct unn_msgAboutDevDelayTrig{
@@ -63,7 +70,9 @@ typedef struct{
 enum{
 
 	_driverDataType_debug = 0,
-		
+
+	_specialRunningType_1sPeriod,
+
 	_driverDataType_dimer,
 	_driverDataType_curtain,
 	_driverDataType_elecMeasure,
@@ -71,6 +80,7 @@ enum{
 	_driverDataType_infraActDetect,
 	_driverDataType_thermostatDriving,
 	_driverDataType_infraredRunning,
+	_driverDataType_solarSysManagerRunning,
 
 	_driverDataType_beepsParamDebug,
 };
@@ -130,7 +140,15 @@ typedef struct{
 		}_beepsDriver_dats;
 	}driverDats;
 }stt_msgDriverHwTimer;
- 
+
+typedef struct{
+
+	uint8_t opStatusNormal:1;
+	uint8_t opRelaySel:3;
+	
+	uint8_t rsv:4;
+}stt_gModeOpFunc;
+
 /**********************
  * GLOBAL PROTOTYPES
  **********************/
@@ -138,6 +156,9 @@ void usrApp_bussinessHardTimer_Init(void);
 void usrAppParamClrReset_devGreenMode(void);
 void usrAppParamSet_devGreenMode(uint8_t paramCst[2], bool nvsRecord_IF);
 void usrAppParamGet_devGreenMode(uint8_t paramCst[2]);
+void usrAppParamSet_devGreenMode_actOption(stt_gModeOpFunc *param, bool nvsRecord_IF);
+void usrAppParamGet_devGreenMode_actOption(stt_gModeOpFunc *param);
+void devParamGet_machineTime(stt_timeFormatDisp *param);
 void usrApp_GreenMode_trig(void);
 void usrAppParamClrReset_devDelayTrig(void);
 void usrAppParamSet_devDelayTrig(uint8_t paramCst[3]);

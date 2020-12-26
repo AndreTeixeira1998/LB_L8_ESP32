@@ -4,6 +4,8 @@
 		新增函数 void externSocket_ex_disp_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t color_p);
 	修改源文件对应ILI9341及ST7789的lcd_adapter.h<line125>：	
 		新增函数声明 void externSocket_ex_disp_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t color_p);
+	修改源文件ILI9341_adapter.cpp / ST7789_adapter.cpp <line44>：
+		语句内 dma缓存增大 int dma_word_size = 1024 * 4
 
 	添加用户自定义手势识别判断逻辑
 	修改源文件lvgl_indev_adapter.c<line52、line146-257>
@@ -12,6 +14,10 @@
 	注释掉背光灯初始化使其失效，因为工程应用中需要pwm调制背光亮度，如果不注释掉的话，就只能在lcd初始化后面进行pwm初始化
 	修改源文件.spi_lcd.c<line210-215>
 		注释掉多余的业务代码
+	修改源文件.spi_lcd.c<line172>
+		添加新行.max_transfer_sz = 1024 * 12, 增大spi传输缓存
+		
+	将LVGL屏长宽关键部分 改为变量控制，方便进行横屏竖屏切换，不会产生马赛克
 	
 .触摸部分
 	任意触摸更新唤醒时间，通过事件进行通知，将原触摸驱动内添加触摸触发事件组 xEventGp_screenTouch

@@ -1,13 +1,5 @@
 #include "devDriver_heater.h"
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/queue.h"
-#include "freertos/task.h"
-#include "freertos/timers.h"
-#include "freertos/semphr.h"
-#include "freertos/event_groups.h"
-#include "esp_freertos_hooks.h"
-
 #include "mlink.h"
 #include "mwifi.h"
 #include "mdf_common.h"
@@ -35,14 +27,15 @@
 
 static bool devDriver_moudleInitialize_Flg = false;
 
-static stt_Heater_actAttr devParam_heater = {
+static volatile stt_Heater_actAttr devParam_heater = {
 
 	.timeCountParam.relaySynchronousDnCounter = 0,
 	.timeCountParam.timeUp_period			  = 0,
 	.timeCountParam.timeUp_counter			  = 0,
 	.timeCountParam.timeCount_En			  = 0,
-	.timeCountParam.timeUp_period_customSet   = 10 * DEVHEATER_COEFFICIENT_TIME_SECOND, //默认自定义延时关闭时间为60s
+	.timeCountParam.timeUp_period_customSet   = 10 * 60 * DEVHEATER_COEFFICIENT_TIME_SECOND, //默认自定义延时关闭时间为60分钟
 };
+static bool volatile driverParamChanging_flg = false;
 
 xQueueHandle msgQh_devHeaterDriver = NULL;
 
@@ -51,7 +44,13 @@ static void devDriverBussiness_heaterSwitch_periphInit(void){
 	devTypeDef_enum swCurrentDevType = currentDev_typeGet();
 	gpio_config_t io_conf = {0};
 
-	if(swCurrentDevType != devTypeDef_heater)return;
+#if(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_HEATER)
+	if((swCurrentDevType != devTypeDef_heater) &&
+	   (swCurrentDevType != devTypeDef_mulitSwOneBit))return;
+#else
+	if((swCurrentDevType != devTypeDef_heater) &&
+	   (swCurrentDevType != devTypeDef_largeCurOneBit))return;
+#endif
 	
 	//disable interrupt
 	io_conf.intr_type = GPIO_PIN_INTR_DISABLE;
@@ -79,7 +78,14 @@ void devDriverBussiness_heaterSwitch_moudleInit(void){
 
 	devTypeDef_enum swCurrentDevType = currentDev_typeGet();
 
-	if(swCurrentDevType != devTypeDef_heater)return;
+#if(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_HEATER)
+		if((swCurrentDevType != devTypeDef_heater) &&
+		   (swCurrentDevType != devTypeDef_mulitSwOneBit))return;
+#else
+		if((swCurrentDevType != devTypeDef_heater) &&
+		   (swCurrentDevType != devTypeDef_largeCurOneBit))return;
+#endif
+	
 	if(devDriver_moudleInitialize_Flg)return;
 
 #if(DEVICE_DRIVER_DEFINITION == DEVICE_DRIVER_METHOD_BY_SLAVE_MCU)
@@ -115,6 +121,8 @@ void IRAM_ATTR devDriverBussiness_heaterSwitch_runningDetectLoop(void){
 
 	static stt_devHeater_opratAct opreatAct_localRecord = heaterOpreatAct_close;
 	stt_msgDats_devHeaterDriver sptr_msgQ_devHeaterDriver = {0};
+
+	if(true == driverParamChanging_flg)return;
 
 	if(devParam_heater.timeCountParam.relaySynchronousDnCounter != COUNTER_DISENABLE_MASK_SPECIALVAL_U32){
 
@@ -191,7 +199,15 @@ void devDriverBussiness_heaterSwitch_periphStatusReales(stt_devDataPonitTypedef 
 	devTypeDef_enum swCurrentDevType = currentDev_typeGet();
 	static stt_devHeater_opratAct opreatAct_localRecord = heaterOpreatAct_close;
 
-	if(swCurrentDevType == devTypeDef_heater){
+#if(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_HEATER)
+		if((swCurrentDevType == devTypeDef_heater) ||
+		   (swCurrentDevType == devTypeDef_mulitSwOneBit)){
+#else
+		if((swCurrentDevType == devTypeDef_heater) ||
+		   (swCurrentDevType == devTypeDef_largeCurOneBit)){
+#endif
+
+		driverParamChanging_flg = true;
 
 		devParam_heater.opreatAct = param->devType_heater.devHeater_swEnumVal;
 		printf("heater opreatAct set:%d.\n", devParam_heater.opreatAct);
@@ -255,6 +271,8 @@ void devDriverBussiness_heaterSwitch_periphStatusReales(stt_devDataPonitTypedef 
 		}
 
 		opreatAct_localRecord = devParam_heater.opreatAct;
+
+		driverParamChanging_flg = false;
 	}
 }
 

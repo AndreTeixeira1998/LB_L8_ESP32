@@ -20,6 +20,8 @@
 extern void lvGui_tipsFullScreen_generate(const char *strTips, uint8_t timeOut);
 extern void lvGui_tipsFullScreen_generateAutoTime(const char *strTips);
 extern void lvGui_tipsFullScreen_distruction(void);
+extern void usrApplication_taskRoot_forceDisableTrig(void);
+extern void usrApplication_taskRoot_backRecoveryTrig(void);
 
 extern TaskHandle_t taskHandle_communicateTrigBussiness;
 
@@ -28,6 +30,10 @@ extern stt_nodeDev_hbDataManage *listHead_nodeDevDataManage;
 extern EventGroupHandle_t xEventGp_devApplication;
 
 static const char *TAG = "L8_OTA_upgrade";
+
+//#define DT_UPGRADE_STK_SIZE		(1024 * 4)
+//static StackType_t dtUpGrade_xStack[DT_UPGRADE_STK_SIZE];
+//static StaticTask_t dtUpGrade_xTaskBuffer;
 
 static const char *severAddressHead = "http://112.124.61.191:8080/sm/image/device_firmware/";
 
@@ -65,6 +71,8 @@ static void upgradeMeshOTA_applicationTask(void *arg){
         .transport_type = HTTP_TRANSPORT_UNKNOWN,
     };
 
+	MDF_LOGW("upgrade task running.\n");
+
 	flg_upgradeTrig = true; //远程升级已启动
 
 	lvGui_tipsFullScreen_generateAutoTime("upgrade stand by. . .");
@@ -90,9 +98,11 @@ static void upgradeMeshOTA_applicationTask(void *arg){
 
     const char *upgStandBy_str = L8_MESH_CONMUNICATE_UPGSTBY_NOTICE_STR;
     ret = mwifi_root_write(upgradeDestAddr, upgradeDevNum, &data_type, upgStandBy_str, strlen(upgStandBy_str) + 1, true); //长度加上字符串本身的\0
+	if(ret != MDF_OK)lvGui_tipsFullScreen_generate("network not ready,\n pls wait for a while", 3);
+	vTaskDelay(1000 / portTICK_RATE_MS);
     MDF_ERROR_GOTO(ret != MDF_OK, EXIT, "<%s> mwifi_root_recv", mdf_err_to_name(ret));
 
-	vTaskDelay(10000 / portTICK_RATE_MS);
+	vTaskDelay(6000 / portTICK_RATE_MS);
 
 	memset(&rmOTA_statusParam, 0, sizeof(stt_statusParam_httpUpgrade));
 	rmOTA_statusParam.downloading_if = 1;
@@ -158,8 +168,10 @@ static void upgradeMeshOTA_applicationTask(void *arg){
 
 						sprintf(strTips, "firmware \ndownloading %d%%.", percent);
 						lvGui_tipsFullScreen_generate(strTips, 254);
+//						usrApp_fullScreenRefresh_self(50, 0);
 
-						MDF_LOGI("%s\n", strTips);
+//						MDF_LOGI("%s\n", strTips);
+						MDF_LOGW("%s\n", strTips);
 
 						esp_task_wdt_feed(); //task喂狗
 						vTaskDelay(100 / portTICK_RATE_MS);
@@ -173,7 +185,7 @@ static void upgradeMeshOTA_applicationTask(void *arg){
 	        }else
 			if(recv_size == total_size){
 				
-	            MDF_LOGI("Connection closed, all data received");
+	            MDF_LOGW("Connection closed, all data received");
 	            break;
 	        } 
 			else
@@ -186,7 +198,7 @@ static void upgradeMeshOTA_applicationTask(void *arg){
 	        }
 	    }
 
-	    MDF_LOGI("The service download firmware is complete, Spend time: %ds",
+	    MDF_LOGW("The service download firmware is complete, Spend time: %ds",
 	             (xTaskGetTickCount() - start_time) * portTICK_RATE_MS / 1000);
 
 	    start_time = xTaskGetTickCount();
@@ -209,7 +221,7 @@ static void upgradeMeshOTA_applicationTask(void *arg){
 	lvGui_tipsFullScreen_generate("firmware \nforward success", 15); //全屏阻塞UI提示
 	vTaskDelay(2000 / portTICK_RATE_MS);
 
-    MDF_LOGI("Firmware is sent to the device to complete, Spend time: %ds",
+    MDF_LOGW("Firmware is sent to the device to complete, Spend time: %ds",
              (xTaskGetTickCount() - start_time) * portTICK_RATE_MS / 1000);
 
     const char *restart_str = L8_MESH_CONMUNICATE_RESTART_NOTICE_STR;
@@ -245,7 +257,11 @@ EXIT:
 	flg_upgradeTrig = false;
 
 	vTaskResume(taskHandle_communicateTrigBussiness);
+//	usrApplication_taskRoot_backRecoveryTrig();
+	mqtt_app_start();
 	tipsOpreatSet_sysUpgrading(1);
+
+	MDF_LOGW("upgrade task exit.\n");
 
 	vTaskDelete(NULL);
 }
@@ -261,7 +277,7 @@ void usrAppUpgrade_firewareNameSet(const char *fName){
 
 	strcpy(upgradeFirewareName_temp, fName);
 
-	MDF_LOGI("mupgrade firmwareName chg to \"%s\"", fName);
+	MDF_LOGW("mupgrade firmwareName chg to \"%s\"", fName);
 }
 
 void usrAppUpgrade_targetDevaddrSet(const uint8_t addr[MWIFI_ADDR_LEN]){
@@ -313,10 +329,40 @@ void mwifiApp_firewareUpgrade_nodeNoticeToRoot(void){
 
 void upgradeMeshOTA_taskCreatAction(void){
 
+	// TaskHandle_t xHandle = NULL;
+
+	// xHandle = xTaskCreateStatic(upgradeMeshOTA_applicationTask, 
+	// 							"L8OTA_TASK", 
+	// 							DT_UPGRADE_STK_SIZE, 
+	// 							NULL, 
+	// 							CONFIG_MDF_TASK_DEFAULT_PRIOTY, 
+	// 							dtUpGrade_xStack,
+	// 							&dtUpGrade_xTaskBuffer);		
+
+	// if(NULL != xHandle){
+
+	// 	printf("upgrade task creat success.\n");
+	// }
+	// else{
+
+	// 	printf("upgrade task creat fail.\n");
+	// 	vTaskDelay(1000 / portTICK_RATE_MS);
+	// 	lvGui_tipsFullScreen_generate("OTA task creat fail", 3); //全屏阻塞UI提示
+	// }
+
 	portBASE_TYPE res = MDF_FAIL;
 
-	res = xTaskCreate(upgradeMeshOTA_applicationTask, "L8OTA_TASK", 6 * 1024, NULL, CONFIG_MDF_TASK_DEFAULT_PRIOTY, NULL);		
-	MDF_LOGI("upgrade task creat res = %d.\n", res);
+//	extern void usrApplication_taskRoot_forceDisableTrig(void);
+//	usrApplication_taskRoot_forceDisableTrig();
+	mqtt_app_destory();
+	vTaskDelay(3000 / portTICK_RATE_MS);
+
+	res = xTaskCreate(upgradeMeshOTA_applicationTask, "L8OTA_TASK", 1024 * 4, NULL, CONFIG_MDF_TASK_DEFAULT_PRIOTY, NULL);		
+	printf("upgrade task creat res = %d.\n", res);
+	if(pdPASS != res){
+
+		lvGui_tipsFullScreen_generate("OTA task creat fail", 3); //全屏阻塞UI提示
+	}
 }
 
 void usrApp_firewareUpgrade_trig(bool mulitUpgrade_if, uint8_t devtype){

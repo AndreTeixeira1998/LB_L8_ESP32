@@ -25,6 +25,14 @@ extern "C" {
  **********************/
 typedef enum{
 
+	socketTypeSpecifi_Safrica = 0, //南非，0
+	socketTypeSpecifi_General, //常规，1
+	socketTypeSpecifi_British, //英规，2
+	socketTypeSpecifi_America  //美规，3
+}enumSpecification_socketType;
+
+typedef enum{
+
    ntStatus_noneNet = 0,
    ntStatus_offline,
    ntStatus_online,

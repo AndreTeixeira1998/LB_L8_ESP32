@@ -14,6 +14,7 @@ extern "C" {
  *      INCLUDES
  *********************/
 #include "esp_types.h"
+#include "lvgl.h"
 
 /*********************
  *      DEFINES
@@ -32,6 +33,7 @@ extern "C" {
 typedef enum{
 
 	atmosphereLightType_none = 0,
+	atmosphereLightType_idleCfgPreview,
 	atmosphereLightType_normalWithoutNet,
 	atmosphereLightType_normalNetNode,
 	atmosphereLightType_normalNetRoot,
@@ -66,15 +68,24 @@ typedef struct{
 	uint16_t	runningCounter;
 }stt_devBeepRunningParam;
 
+typedef struct{
+
+	lv_color_t 	lightColorCustomParamcfg;
+	uint8_t 	runingAsCustomCfg_flg:1;
+	uint8_t 	customCfg_breathIf:1;
+}stt_devAtmosLightRunningParam;
+
 /**********************
  * GLOBAL PROTOTYPES
  **********************/
 void deviceHardwareAcoustoOptic_Init(void);
 void bussiness_devLight_testApp(void);
 enum_screenBkLight_status devScreenBkLight_brightnessGet(void);
+enum_atmosphereLightType devAtmosphere_statusTips_trigGet(void);
 void devAtmosphere_statusTips_trigSet(enum_atmosphereLightType tipsType);
 
 void tipsOpreatSet_sysUpgrading(uint16_t valSet);
+void tipsOpreatSet_sysWarning(uint16_t valSet);
 void tipsOpreatAutoSet_sysUpgrading(void);
 void tipsSysUpgrading_realesRunning(void);
 
@@ -92,6 +103,8 @@ uint8_t devScreenDriver_configParam_brightness_get(void);
 uint8_t devScreenDriver_configParam_brightnessSleep_get(void);
 void devScreenDriver_configParam_screenLightTime_set(uint32_t timeVal, bool nvsRecord_IF);
 uint32_t devScreenDriver_configParam_screenLightTime_get(void);
+void devAtmosLight_runningParam_get(stt_devAtmosLightRunningParam *param);
+void devAtmosLight_runningParam_set(stt_devAtmosLightRunningParam *param, bool nvsRecord_IF);
 
 #ifdef __cplusplus
 } /* extern "C" */

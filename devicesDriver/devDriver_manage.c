@@ -79,16 +79,24 @@ static devTypeDef_enum	lanbon_l8device_currentDevType = L8_DEVICE_TYPE_DEFULT;
 
 static stt_devStatusRecord deviceStatusRecordIF_Flg = {
 
-	.devStatusOnOffRecord_IF 	= 0,
+	.devStatusOnOffRecord_IF 	= 1,
 	.devElecsumDisp_IF 		 	= 1,
 	.devScreenLandscape_IF	 	= 0,
 	.devUpgradeFirstRunning_FLG = 0,
+	.screensaverRunning_IF		= 0,
+	.homeassitant_En			= 0,
 };
 
+static stt_devSystemKeyParamRecord deviceSystemKeyParam = {
+
+	.sysParam_meshRoleForceAsChild = 0,
+};
+	
 static bool devDpTrig_funcFlg_nvsRecord = false;
 static bool devDpTrig_funcFlg_mutualCtrlTrig = false;
 static bool devDpTrig_funcFlg_statusUploadMedthod = false;
 static bool devDpTrig_funcFlg_synchronousReport = false;
+static bool devDpTrig_funcFlg_localMeshSuperSync = false;
 
 static pcnt_isr_handle_t isrPcnt_applicationHandle = NULL;
 static uart_isr_handle_t isrUart_applicationHandle = NULL;
@@ -433,6 +441,60 @@ static void devDriverInit_drvBy74595(void){
 
 #endif
 
+static void devSystemDeviceTypedefExamination(void){
+
+#if(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_ALL_RESERVE)
+	
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_SHARE_MIX)
+	if((devTypeDef_mulitSwOneBit != lanbon_l8device_currentDevType)&&\
+	   (devTypeDef_mulitSwTwoBit != lanbon_l8device_currentDevType)&&\
+	   (devTypeDef_mulitSwThreeBit != lanbon_l8device_currentDevType)&&\
+	   (devTypeDef_curtain != lanbon_l8device_currentDevType)&&\
+	   (devTypeDef_scenario != lanbon_l8device_currentDevType)){
+	   lanbon_l8device_currentDevType = devTypeDef_mulitSwThreeBit;
+	}
+		
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_FANS)
+
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_DIMMER)
+
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_HEATER)
+   if((devTypeDef_heater != lanbon_l8device_currentDevType)&&\
+	  (devTypeDef_mulitSwOneBit != lanbon_l8device_currentDevType)){
+	  lanbon_l8device_currentDevType = devTypeDef_heater;
+   }
+   	
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_LC_1GANG)
+
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RGBLAMP_BELT)
+
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RGBLAMP_BULB)
+
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_INFRARED)
+
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_SOCKET)
+
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_MOUDLE)
+
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_MULIT_THERMO)
+
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_THERMO_INDP_A)
+
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_SOLAR_SYS_MANAGER)
+
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_GAS_DETECTOR)
+
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_SMOKE_DETECTOR)
+
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_PIR_DETECTOR)
+
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RELAY_BOX)
+
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_UART_MOUDLE)
+	   
+#endif
+}
+
 void isrHandleFuncPcntUnit_regster(void (*funcHandle)(uint32_t evtStatus), uint8_t funcIst){
 
 	pcntDeviceDriver_handleFunc_list[funcIst] = funcHandle;
@@ -440,7 +502,7 @@ void isrHandleFuncPcntUnit_regster(void (*funcHandle)(uint32_t evtStatus), uint8
 
 uint8_t deviceTypeVersionJudge(uint8_t devType){
 
-	uint8_t typeVersion = 0;
+	uint8_t typeVersion = DEV_TYPES_PANEL_DEF_NULL;
 
 	switch(devType){
 
@@ -448,11 +510,24 @@ uint8_t deviceTypeVersionJudge(uint8_t devType){
 		case devTypeDef_mulitSwTwoBit:
 		case devTypeDef_mulitSwThreeBit:
 		case devTypeDef_scenario:
-		case devTypeDef_curtain:
+		case devTypeDef_curtain:{
+
+			typeVersion = DEV_TYPES_PANEL_DEF_SHARE_MIX;
+
+		}break;
+
+		case devTypeDef_relayBox_1bit:
+		case devTypeDef_relayBox_2bit:
+		case devTypeDef_relayBox_curtain:{
+
+			typeVersion = DEV_TYPES_PANEL_DEF_RELAY_BOX;
+
+		}break;
+
 		case devTypeDef_thermostat:
 		case devTypeDef_thermostatExtension:{
 
-			typeVersion = DEV_TYPES_PANEL_DEF_SHARE_MIX;
+			typeVersion = DEV_TYPES_PANEL_DEF_MULIT_THERMO;
 
 		}break;
 			
@@ -495,6 +570,54 @@ uint8_t deviceTypeVersionJudge(uint8_t devType){
 
 		}break;
 
+		case devTypeDef_voltageSensor:{
+
+			typeVersion = DEV_TYPES_PANEL_DEF_SOLAR_SYS_MANAGER;
+
+		}break;
+
+		case devTypeDef_largeCurOneBit:{
+
+			typeVersion = DEV_TYPES_PANEL_DEF_LC_1GANG;
+
+		}break;
+
+		case devTypeDef_rgbLampBelt:{
+
+			typeVersion = DEV_TYPES_PANEL_DEF_RGBLAMP_BELT;
+
+		}break;
+		
+		case devTypeDef_rgbLampBulb:{
+
+			typeVersion = DEV_TYPES_PANEL_DEF_RGBLAMP_BULB;
+
+		}break;
+		
+		case devTypeDef_gasDetect:{
+
+			typeVersion = DEV_TYPES_PANEL_DEF_GAS_DETECTOR;
+
+		}break;
+
+		case devTypeDef_smokeDetect:{
+
+			typeVersion = DEV_TYPES_PANEL_DEF_SMOKE_DETECTOR;
+
+		}break;
+
+		case devTypeDef_pirDetect:{
+
+			typeVersion = DEV_TYPES_PANEL_DEF_PIR_DETECTOR;
+
+		}break;
+
+		case devTypeDef_uartMoudle:{
+
+			typeVersion = DEV_TYPES_PANEL_DEF_UART_MOUDLE;
+
+		}break;
+
 		default:{
 
 			typeVersion = DEV_TYPES_PANEL_DEF_NULL;
@@ -513,6 +636,7 @@ devTypeDef_enum IRAM_ATTR currentDev_typeGet(void){ //需在中断内调用，�
 void currentDev_typeSet(devTypeDef_enum devType, bool nvsRecord_IF){
 
 	lanbon_l8device_currentDevType = devType;
+	devSystemDeviceTypedefExamination(); //类型切换检测并纠错
 	if(nvsRecord_IF)devSystemInfoLocalRecord_save(saveObj_devTypeDef, &lanbon_l8device_currentDevType);
 }
 
@@ -525,6 +649,17 @@ void devStatusRecordIF_paramSet(stt_devStatusRecord *param, bool nvsRecord_IF){
 void devStatusRecordIF_paramGet(stt_devStatusRecord *param){
 
 	memcpy(param, &deviceStatusRecordIF_Flg, sizeof(stt_devStatusRecord));
+}
+
+void devSystemKeyAttr_paramSet(stt_devSystemKeyParamRecord *param, bool nvsRecord_IF){
+
+	memcpy(&deviceSystemKeyParam, param, sizeof(stt_devSystemKeyParamRecord));
+	if(nvsRecord_IF)devSystemInfoLocalRecord_save(saveObj_devSysKeyParam, &deviceSystemKeyParam);
+}
+
+void devSystemKeyAttr_paramGet(stt_devSystemKeyParamRecord *param){
+
+	memcpy(param, &deviceSystemKeyParam, sizeof(stt_devSystemKeyParamRecord));
 }
 
 void devInfo_statusRecord_action(void){
@@ -554,6 +689,11 @@ void deviceDatapointSynchronousReport_actionTrig(void){
 	xEventGroupSetBits(xEventGp_devApplication, DEVAPPLICATION_FLG_BITHOLD_DEVSTATUS_SYNCHRO);
 }
 
+void deviceDatapointSynchronousMeshSuper_actionTrig(void){
+
+	xEventGroupSetBits(xEventGp_devApplication, DEVAPPLICATION_FLG_DEVLOCAL_SUPER_SYCN);
+}
+
 bool devStatusDispMethod_landscapeIf_get(void){
 
 	bool res = false;
@@ -578,20 +718,41 @@ bool deviceFistRunningJudge_get(void){
 
 void devDriverApp_responseAtionTrig_instant(void){ //数据点触发即时响应动作
 
-#if(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_INFRARED) ||\
-   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_SOCKET) ||\
-   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_MOUDLE)
+#if(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RGBLAMP_BELT)||\
+   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RGBLAMP_BULB)
 
+	devBeepTips_trig(3, 10, 150, 0, 1); //蜂鸣器
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_GAS_DETECTOR)||\
+	 (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_SMOKE_DETECTOR)||\
+	 (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_PIR_DETECTOR)||\
+	 (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_UART_MOUDLE)||\
+     (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_UART_MOUDLE)
+	 
+		 //不要出声，什么也不做
+		 
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_INFRARED)||\
+     (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_SOCKET)||\
+     (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_MOUDLE)||\
+     (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RELAY_BOX)
+
+	devBeepTips_trig(3, 10, 150, 0, 1); //蜂鸣器
 	devStatusRunning_tipsRefresh(); //tips刷新
 #else
 
+ #if(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_SOLAR_SYS_MANAGER)
+	if(true == devDriverBussiness_solarSysManager_scrWakeByVol())
+		devScreenBkLight_weakUp(); //屏幕唤醒
+ #else
 	devScreenBkLight_weakUp(); //屏幕唤醒
+ #endif
+
 	pageHome_buttonMain_imageRefresh(false); //UI控件刷新
+ #if(L8_DEVICE_TYPE_PANEL_DEF != DEV_TYPES_PANEL_DEF_SOLAR_SYS_MANAGER) //防止变化频率高，蜂鸣器一直叫
 
+	devBeepTips_trig(3, 10, 150, 0, 1); //蜂鸣器
 	devAtmosphere_statusTips_trigSet(atmosphereLightType_dataSaveOpreat);
+ #endif
 #endif
-
-	devBeepTips_trig(3, 10, 150, 0, 1);
 
 	usrApp_GreenMode_trig(); //绿色模式业务
 	if(devDpTrig_funcFlg_mutualCtrlTrig)usrAppMutualCtrl_actionTrig(); //互控触发
@@ -602,6 +763,7 @@ void devDriverApp_responseAtionTrig_delay(void){ //数据点触发延时响应�
 	usrAppParamSet_hbRealesInAdvance(devDpTrig_funcFlg_statusUploadMedthod); //心跳提前响应
 	if(devDpTrig_funcFlg_nvsRecord)devInfo_statusRecord_action(); //状态记忆同步
 	if(devDpTrig_funcFlg_synchronousReport)deviceDatapointSynchronousReport_actionTrig(); //状态同步上传
+	if(devDpTrig_funcFlg_localMeshSuperSync)deviceDatapointSynchronousMeshSuper_actionTrig(); //本地mesh超级同步
 }
 
 void devDriverApp_responseAtionTrig(void){
@@ -613,32 +775,45 @@ void devDriverApp_responseAtionTrig(void){
 void devDriverParamChg_dataRealesTrig(bool nvsRecord_IF, 
 										  	   bool mutualCtrlTrig_IF, 
 										  	   bool statusUploadMedthod,
-										  	   bool synchronousReport_IF){
+										  	   bool synchronousReport_IF,
+										  	   bool syncMeshSuper_IF){
 
 	//延时响应属性数据更新
 	devDpTrig_funcFlg_nvsRecord 		  = nvsRecord_IF;
 	devDpTrig_funcFlg_mutualCtrlTrig	  = mutualCtrlTrig_IF;
 	devDpTrig_funcFlg_statusUploadMedthod = statusUploadMedthod;
 	devDpTrig_funcFlg_synchronousReport   = synchronousReport_IF;
+	devDpTrig_funcFlg_localMeshSuperSync  = syncMeshSuper_IF;
 
 	//动作响应
 	devDriverApp_responseAtionTrig();
 }
 
-void currentDev_dataPointRecovery(stt_devDataPonitTypedef *param){
+void currentDev_dataPointRecovery(stt_devDataPonitTypedef *param,
+															  bool nvsRecord_IF, 
+															  bool mutualCtrlTrig_IF, 
+															  bool statusUploadMedthod,
+															  bool synchronousReport_IF,
+															  bool syncMeshSuper_IF){
 
 	//仅数据更新，驱动不响应
-	memcpy(&deviceDataPointRecord_lastTime, &lanbon_l8device_currentDataPoint, sizeof(stt_devDataPonitTypedef)); //设备状态数据点记录,当前状态转为历史状态，用于互控比对
+	if(false == mutualCtrlTrig_IF)
+		memcpy(&deviceDataPointRecord_lastTime, &lanbon_l8device_currentDataPoint, sizeof(stt_devDataPonitTypedef)); //设备状态数据点记录,当前状态转为历史状态，用于互控比对
 	memcpy(&lanbon_l8device_currentDataPoint, param, sizeof(stt_devDataPonitTypedef)); //常规响应
 
-	devDriverParamChg_dataRealesTrig(false, false, false, false);
+	devDriverParamChg_dataRealesTrig(nvsRecord_IF, 
+									 mutualCtrlTrig_IF, 
+									 statusUploadMedthod, 
+									 synchronousReport_IF, 
+									 syncMeshSuper_IF);
 }
 
 void currentDev_dataPointSet(stt_devDataPonitTypedef *param, 
 													   bool nvsRecord_IF, 
 													   bool mutualCtrlTrig_IF, 
 													   bool statusUploadMedthod,
-													   bool synchronousReport_IF){
+													   bool synchronousReport_IF,
+													   bool syncMeshSuper_IF){
 
 	//常规响应
 	memcpy(&deviceDataPointRecord_lastTime, &lanbon_l8device_currentDataPoint, sizeof(stt_devDataPonitTypedef)); //设备状态数据点记录,当前状态转为历史状态，用于互控比对
@@ -646,18 +821,29 @@ void currentDev_dataPointSet(stt_devDataPonitTypedef *param,
 
 	switch(lanbon_l8device_currentDevType){
 
+		case devTypeDef_largeCurOneBit:
 		case devTypeDef_mulitSwOneBit:
 		case devTypeDef_mulitSwTwoBit:
 		case devTypeDef_mulitSwThreeBit:
 		case devTypeDef_moudleSwOneBit:
 		case devTypeDef_moudleSwTwoBit:
-		case devTypeDef_moudleSwThreeBit:{
+		case devTypeDef_moudleSwThreeBit:
+		case devTypeDef_relayBox_1bit:
+		case devTypeDef_relayBox_2bit:{
 
 #if(DEVICE_DRIVER_DEFINITION == DEVICE_DRIVER_METHOD_BY_SLAVE_MCU) && (DRVMETHOD_BY_SLAVE_MCU_RELAY_TEST == 1)
 			
 			uint8_t opVal = 0;
 			memcpy(&opVal, param, sizeof(stt_devDataPonitTypedef));
 			devDriverApp_statusExexuteBySlaveMcu(opVal);
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_HEATER) ||\
+	 (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_LC_1GANG)
+
+			stt_devDataPonitTypedef dpSwap_temp = {0};
+			(param->devType_mulitSwitch_oneBit.swVal_bit1)?
+				(dpSwap_temp.devType_heater.devHeater_swEnumVal = heaterOpreatAct_open):
+				(dpSwap_temp.devType_heater.devHeater_swEnumVal = heaterOpreatAct_close);
+			devDriverBussiness_heaterSwitch_periphStatusReales(&dpSwap_temp);
 #else
 
 			devDriverBussiness_mulitBitSwitch_periphStatusReales(param);			
@@ -683,18 +869,13 @@ void currentDev_dataPointSet(stt_devDataPonitTypedef *param,
 		}break;
 
 		case devTypeDef_moudleSwCurtain:
+		case devTypeDef_relayBox_curtain:
 		case devTypeDef_curtain:{
 
 			devDriverBussiness_curtainSwitch_periphStatusReales(param);
 
 		}break;
 
-		case devTypeDef_infrared:{
-
-			devDriverBussiness_infraredSwitch_periphStatusReales(param);
-
-		}break;
-		
 		case devTypeDef_socket:{
 
 			devDriverBussiness_socketSwitch_periphStatusReales(param);
@@ -718,14 +899,67 @@ void currentDev_dataPointSet(stt_devDataPonitTypedef *param,
 			devDriverBussiness_heaterSwitch_periphStatusReales(param);
 
 		}break;
+
+#if(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_INFRARED)
+
+		case devTypeDef_infrared:{
 		
+			devDriverBussiness_infraredSwitch_periphStatusReales(param);
+		
+		}break;
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_SOLAR_SYS_MANAGER)
+
+		case devTypeDef_voltageSensor:{
+
+			devDriverBussiness_solarSysManager_StatusReales(param);
+
+		}break;
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RGBLAMP_BELT) ||\
+	 (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RGBLAMP_BULB)
+
+		case devTypeDef_rgbLampBelt:
+		case devTypeDef_rgbLampBulb:{
+
+			devDriverBussiness_rgbLamp_periphStatusReales(param);
+
+		}break;
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_GAS_DETECTOR)
+
+		case devTypeDef_gasDetect:{
+
+			devDriverBussiness_gasDetect_periphStatusReales(param);
+
+		}break;
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_SMOKE_DETECTOR)
+
+		case devTypeDef_smokeDetect:{
+
+			devDriverBussiness_smokeDetect_periphStatusReales(param);
+
+		}break;
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_PIR_DETECTOR)
+
+		case devTypeDef_pirDetect:{
+
+			devDriverBussiness_pirDetect_periphStatusReales(param);
+
+		}break;
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_UART_MOUDLE)
+
+		case devTypeDef_uartMoudle:{
+
+			devDriverBussiness_uartMoudle_periphStatusReales(param);
+
+		}break;
+#endif
 		default:break;
 	}
 
 	devDriverParamChg_dataRealesTrig(nvsRecord_IF, 
 								 	 mutualCtrlTrig_IF, 
 								 	 statusUploadMedthod, 
-								 	 synchronousReport_IF);
+								 	 synchronousReport_IF,
+								 	 syncMeshSuper_IF);
 }
 
 void currentDev_dataPointGet(stt_devDataPonitTypedef *param){
@@ -751,27 +985,35 @@ void currentDev_dataPointGetwithRecord(stt_devDataPonitTypedef *param){
 
 	switch(currentDev_typeGet()){
 
+		case devTypeDef_largeCurOneBit:
 		case devTypeDef_mulitSwOneBit:
 		case devTypeDef_mulitSwTwoBit:
 		case devTypeDef_mulitSwThreeBit:
 		case devTypeDef_moudleSwOneBit:
 		case devTypeDef_moudleSwTwoBit:
-		case devTypeDef_moudleSwThreeBit:{
+		case devTypeDef_moudleSwThreeBit:
+		case devTypeDef_relayBox_1bit:
+		case devTypeDef_relayBox_2bit:{
+
+			static uint8_t dataPointHexTemp_localRcd = 0; //本地记录对比，每被调用时才记录
 
 			dataPointHexTemp &= 0x07; //除低三位以外全部清零
 			
 			for(uint8_t loopOpt = 0; loopOpt < DEVICE_MUTUAL_CTRL_GROUP_NUM; loopOpt ++){ //有效位数
 			
-				if((dataPointHexTemp_record & (1 << loopOpt)) != (dataPointHexTemp_current & (1 << loopOpt))){
+				if((dataPointHexTemp_localRcd & (1 << loopOpt)) != (dataPointHexTemp_current & (1 << loopOpt))){
 			
 					dataPointHexTemp |= (1 << (loopOpt + 5)); //高三位对应动作位置位
 				}
 			}
 
+			memcpy(&dataPointHexTemp_localRcd, &dataPointHexTemp_current, sizeof(uint8_t));
+
 		}break;
 
 		case devTypeDef_curtain:
 		case devTypeDef_moudleSwCurtain:
+		case devTypeDef_relayBox_curtain:
 		case devTypeDef_heater:
 		case devTypeDef_dimmer:
 		case devTypeDef_infrared:
@@ -800,6 +1042,7 @@ void currentDev_extParamSet(void *param){
 		switch(currentDev_typeGet()){ //根据设备类型进行扩展数据设置操作
 
 			case devTypeDef_curtain:
+			case devTypeDef_relayBox_curtain:
 			case devTypeDef_moudleSwCurtain:{
 
 				uint8_t orbitalPeriodTime_valSet = dataParam[0];
@@ -808,7 +1051,7 @@ void currentDev_extParamSet(void *param){
 				devDataPoint.devType_curtain.devCurtain_actMethod = 0;
 				devDataPoint.devType_curtain.devCurtain_actEnumVal =\
 					curtainRunningStatus_cTact_close;
-				currentDev_dataPointSet(&devDataPoint, false, false, false, false); //全关一次，使校准
+				currentDev_dataPointSet(&devDataPoint, false, false, false, false, false); //全关一次，使校准
 
 			}break;
 			
@@ -824,7 +1067,7 @@ void currentDev_extParamSet(void *param){
 				if(4 == devDataPoint.devType_heater.devHeater_swEnumVal){
 
 					devHeater_bussinessDispRefresh_customGearSetTrig();
-					currentDev_dataPointSet(&devDataPoint, false, false, false, false);
+					currentDev_dataPointSet(&devDataPoint, false, false, false, false, false);
 				}
 					
 			}break;
@@ -834,12 +1077,80 @@ void currentDev_extParamSet(void *param){
 				uint8_t devThermostatExSwStatusSet_temp = dataParam[0];
 
 				devDriverBussiness_thermostatSwitch_exSwitchParamSet(devThermostatExSwStatusSet_temp);
-				devDriverParamChg_dataRealesTrig(true, true, true, false);
+				devDriverParamChg_dataRealesTrig(true, true, true, false, false);
 
 			}break;
 
+#if(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_SOLAR_SYS_MANAGER)
+
+			case devTypeDef_voltageSensor:{
+
+				stt_solarSysManager_operationParam exDataTemp_SSMR_opParam = {0};
+
+//				printf("exParam data:%d,%d,%d,%d.\n", dataParam[0], dataParam[1], dataParam[2], dataParam[3]);
+
+				devDriverBussiness_solarSysManager_exDevParamGet(&exDataTemp_SSMR_opParam);
+				exDataTemp_SSMR_opParam.voltage_ctrlMin = dataParam[0];
+				exDataTemp_SSMR_opParam.voltage_ctrlMax = dataParam[1];
+				exDataTemp_SSMR_opParam.temperature_alarm = dataParam[2];
+				devDriverBussiness_solarSysManager_exDevParamSet(&exDataTemp_SSMR_opParam, true);
+
+				pageHome_buttonMain_imageRefresh(true); //特殊设备要求，扩展数据显示刷新
+				
+			}break;
+#endif
+
 			default:break;
 		}
+	}
+}
+
+void currentDev_extParamGet_x(uint8_t paramTemp[DEVPARAMEXT_DT_LEN], uint8_t datsType){
+
+	switch(currentDev_typeGet()){
+
+#if(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_SOLAR_SYS_MANAGER)
+
+		case devTypeDef_voltageSensor:{
+
+			paramTemp[0] = datsType;
+
+			switch(datsType){
+
+				case 1:{
+
+//					float dataHandle_temp = devDriverBussiness_solarSysManager_voltageCur_get();
+//					uint16_t dataInteger_prt = functionFloatGetInteger(dataHandle_temp);
+//					uint8_t dataDecimal_prt = functionFloatGetDecimalW2Bit(dataHandle_temp);
+					stt_solarSysManager_operationParam exDataTemp_SSMR_opParam = {0};
+					devDriverBussiness_solarSysManager_exDevParamGet(&exDataTemp_SSMR_opParam);
+					
+					paramTemp[1] = exDataTemp_SSMR_opParam.voltage_ctrlMin;
+					paramTemp[2] = exDataTemp_SSMR_opParam.voltage_ctrlMax;
+					paramTemp[3] = exDataTemp_SSMR_opParam.temperature_alarm;
+
+				}break;
+			
+				case 0:
+				default:{
+
+					float dataHandle_t_temp = devDriverBussiness_temperatureMeasure_get();
+					uint8_t dataInteger_t_prt = functionFloatGetInteger(dataHandle_t_temp);
+					uint8_t dataDecimal_t_prt = functionFloatGetDecimalW2Bit(dataHandle_t_temp);
+					float dataHandle_v_temp = devDriverBussiness_solarSysManager_voltageCur_get();
+					uint8_t dataDecimal_v_prt = functionFloatGetDecimalW2Bit(dataHandle_v_temp);
+					
+					paramTemp[1] = dataInteger_t_prt;
+					paramTemp[2] = dataDecimal_t_prt;
+					paramTemp[3] = dataDecimal_v_prt;
+
+				}break;
+			}
+
+		}break;
+#endif
+
+		default:break;
 	}
 }
 
@@ -848,6 +1159,7 @@ void currentDev_extParamGet(uint8_t paramTemp[DEVPARAMEXT_DT_LEN]){
 	switch(currentDev_typeGet()){ //扩展数据填装
 
 		case devTypeDef_curtain:
+		case devTypeDef_relayBox_curtain:
 		case devTypeDef_moudleSwCurtain:{
 
 			paramTemp[0] = devCurtain_currentPositionPercentGet();
@@ -856,11 +1168,12 @@ void currentDev_extParamGet(uint8_t paramTemp[DEVPARAMEXT_DT_LEN]){
 		
 		case devTypeDef_heater:{
 
-			uint16_t heater_gearCur_period = devDriverBussiness_heaterSwitch_closePeriodCurrent_Get();
+//			uint16_t heater_gearCur_period = devDriverBussiness_heaterSwitch_closePeriodCurrent_Get();
+			uint16_t heater_gearCur_period = devDriverBussiness_heaterSwitch_closePeriodCustom_Get(); //移动端说只要自定义时间档就可以了
 			uint16_t heater_timeRem_counter = devDriverBussiness_heaterSwitch_devParam_closeCounter_Get();
-
-//			memcpy(&(paramTemp[0]), &heater_gearCur_period, sizeof(uint16_t));
-//			memcpy(&(paramTemp[2]), &heater_timeRem_counter, sizeof(uint16_t));
+		
+//			memcpy(&(deviceStatusParam_temp.nodeDev_extFunParam[0]), &heater_gearCur_period, sizeof(uint16_t));
+//			memcpy(&(deviceStatusParam_temp.nodeDev_extFunParam[2]), &heater_timeRem_counter, sizeof(uint16_t));
 
 			paramTemp[0] = (uint8_t)((heater_gearCur_period >> 8) & 0x00ff);
 			paramTemp[1] = (uint8_t)((heater_gearCur_period >> 0) & 0x00ff);
@@ -869,11 +1182,14 @@ void currentDev_extParamGet(uint8_t paramTemp[DEVPARAMEXT_DT_LEN]){
 
 		}break;
 
+#if(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_INFRARED)
+
 		case devTypeDef_infrared:{
 
 			paramTemp[0] = devDriverBussiness_infraredSwitch_currentOpreatNumGet();
 
 		}break;
+#endif
 
 		case devTypeDef_thermostatExtension:{
 
@@ -881,6 +1197,25 @@ void currentDev_extParamGet(uint8_t paramTemp[DEVPARAMEXT_DT_LEN]){
 
 		}break;
 
+#if(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_SOLAR_SYS_MANAGER)
+
+		case devTypeDef_voltageSensor:{
+
+			stt_solarSysManager_operationParam exDataTemp_SSMR_opParam = {0};
+			float dataHandle_temp = devDriverBussiness_solarSysManager_voltageCur_get();
+			uint16_t dataInteger_prt = functionFloatGetInteger(dataHandle_temp);
+			uint8_t dataDecimal_prt = functionFloatGetDecimalW2Bit(dataHandle_temp);
+
+			devDriverBussiness_solarSysManager_exDevParamGet(&exDataTemp_SSMR_opParam);
+			paramTemp[0] = exDataTemp_SSMR_opParam.voltage_ctrlMin;
+			paramTemp[1] = exDataTemp_SSMR_opParam.voltage_ctrlMax;
+			paramTemp[2] = exDataTemp_SSMR_opParam.temperature_alarm;
+			paramTemp[3] = dataDecimal_prt; //额外多上报一个字节，表示实时电压小数部分
+
+		}break;
+#endif
+
+		case devTypeDef_largeCurOneBit:
 		case devTypeDef_mulitSwOneBit:
 		case devTypeDef_mulitSwTwoBit:
 		case devTypeDef_mulitSwThreeBit:
@@ -892,6 +1227,8 @@ void currentDev_extParamGet(uint8_t paramTemp[DEVPARAMEXT_DT_LEN]){
 		case devTypeDef_fans:
 		case devTypeDef_scenario:
 		case devTypeDef_thermostat:
+		case devTypeDef_relayBox_1bit:
+		case devTypeDef_relayBox_2bit:
 		default:{ //其他类型没有特殊扩展数据的开关
 
 			paramTemp[0] = L8_DEVICE_VERSION; //下标一写版本号
@@ -899,6 +1236,41 @@ void currentDev_extParamGet(uint8_t paramTemp[DEVPARAMEXT_DT_LEN]){
 		}break;
 	}
 }
+
+#if(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_GAS_DETECTOR)||\
+   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_SMOKE_DETECTOR)||\
+   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_PIR_DETECTOR)
+void currentDev_detectingReportDataGet(stt_devDetectingDataDef *param){
+
+	switch(currentDev_typeGet()){
+
+#if(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_GAS_DETECTOR)
+		case devTypeDef_gasDetect:{
+
+			devDriverBussiness_gasDetect_alarmParamGet(param);
+
+		}break;
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_SMOKE_DETECTOR)
+		case devTypeDef_smokeDetect:{
+
+			devDriverBussiness_smokeDetect_alarmParamGet(param);
+
+		}break;		
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_PIR_DETECTOR)
+		case devTypeDef_pirDetect:{
+
+			devDriverBussiness_pirDetect_alarmParamGet(param);
+
+		}break;	
+#endif
+		default:break;
+	}
+
+	//二次确认
+	esp_wifi_get_mac(ESP_IF_WIFI_STA, param->devAddr);
+	param->devType = currentDev_typeGet();
+}
+#endif
 
 static void funcation_usrAppMutualCtrl_dataReq(uint8_t *dstDevMacList, uint8_t dstDevNum, uint8_t *dats, uint8_t dataLen){
 
@@ -959,12 +1331,15 @@ void funcation_usrAppMutualCtrlActionTrig(void){
 	//互控触发
 	switch(lanbon_l8device_currentDevType){
 
+		case devTypeDef_largeCurOneBit:
 		case devTypeDef_mulitSwOneBit:
 		case devTypeDef_mulitSwTwoBit:
 		case devTypeDef_mulitSwThreeBit:
 		case devTypeDef_moudleSwOneBit:
 		case devTypeDef_moudleSwTwoBit:
-		case devTypeDef_moudleSwThreeBit:{
+		case devTypeDef_moudleSwThreeBit:
+		case devTypeDef_relayBox_1bit:
+		case devTypeDef_relayBox_2bit:{
 
 			uint8_t dataPointHexTemp_current = 0,
 					dataPointHexTemp_record = 0;
@@ -995,6 +1370,7 @@ void funcation_usrAppMutualCtrlActionTrig(void){
 		}break;
 
 		case devTypeDef_curtain:
+		case devTypeDef_relayBox_curtain:
 		case devTypeDef_moudleSwCurtain:
 		case devTypeDef_dimmer:{
 
@@ -1056,12 +1432,15 @@ void funcation_usrAppMutualCtrlActionTrig(void){
 
 			switch(lanbon_l8device_currentDevType){
 
+				case devTypeDef_largeCurOneBit:
 				case devTypeDef_mulitSwOneBit:
 				case devTypeDef_mulitSwTwoBit:
 				case devTypeDef_mulitSwThreeBit:
 				case devTypeDef_moudleSwOneBit:
 				case devTypeDef_moudleSwTwoBit:
 				case devTypeDef_moudleSwThreeBit:
+				case devTypeDef_relayBox_1bit:
+				case devTypeDef_relayBox_2bit:
 				case devTypeDef_thermostatExtension:{
 
 					for(uint8_t loopMutual = 0; loopMutual < DEVICE_MUTUAL_CTRL_GROUP_NUM; loopMutual ++){
@@ -1086,6 +1465,7 @@ void funcation_usrAppMutualCtrlActionTrig(void){
 				}break;
 
 				case devTypeDef_curtain:
+				case devTypeDef_relayBox_curtain:
 				case devTypeDef_moudleSwCurtain:
 				case devTypeDef_dimmer:{
 
@@ -1130,11 +1510,11 @@ void devDriverManageBussiness_initialition(void){
 	static bool devDriverBySlaveMCU_statusRecovery_flg = false;
 
 #if(DEVICE_DRIVER_DEFINITION == DEVICE_DRIVER_METHOD_BY_SLAVE_MCU)	
+
 	static bool devDriverBySlaveMCU_initialition_flg = false;
-	
 #else
 	
-
+	
 #endif
 
 	static bool isrFunc_pcntIntr_register_flg = false;
@@ -1204,14 +1584,24 @@ void devDriverManageBussiness_initialition(void){
 
 	switch(swCurrentDevType){
 
+		case devTypeDef_largeCurOneBit:
 		case devTypeDef_mulitSwOneBit:
 		case devTypeDef_mulitSwTwoBit:
 		case devTypeDef_mulitSwThreeBit:
 		case devTypeDef_moudleSwOneBit:
 		case devTypeDef_moudleSwTwoBit:
-		case devTypeDef_moudleSwThreeBit:{
+		case devTypeDef_moudleSwThreeBit:
+		case devTypeDef_relayBox_1bit:
+		case devTypeDef_relayBox_2bit:{
+
+#if(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_HEATER) ||\
+   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_LC_1GANG)
+
+			devDriverBussiness_heaterSwitch_moudleInit();
+#else
 
 			devDriverBussiness_mulitBitSwitch_moudleInit();
+#endif
 
 		}break;
 		
@@ -1234,18 +1624,13 @@ void devDriverManageBussiness_initialition(void){
 		}break;
 		
 		case devTypeDef_curtain:
-		case devTypeDef_moudleSwCurtain:{
+		case devTypeDef_moudleSwCurtain:
+		case devTypeDef_relayBox_curtain:{
 
 			devDriverBussiness_curtainSwitch_moudleInit();
 
 		}break;
 
-		case devTypeDef_infrared:{
-
-			devDriverBussiness_infraredSwitch_moudleInit();
-
-		}break;
-		
 		case devTypeDef_socket:{
 
 			devDriverBussiness_socketSwitch_moudleInit();
@@ -1264,7 +1649,55 @@ void devDriverManageBussiness_initialition(void){
 			devDriverBussiness_thermostatSwitch_moudleInit();
 		
 		}break;
+
+#if(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_INFRARED)
+
+		case devTypeDef_infrared:{
 		
+			devDriverBussiness_infraredSwitch_moudleInit();
+		
+		}break;
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_SOLAR_SYS_MANAGER)
+
+		case devTypeDef_voltageSensor:{
+
+			devDriverBussiness_solarSysManager_moudleInit();
+
+		}break;
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RGBLAMP_BELT) ||\
+     (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RGBLAMP_BULB)
+
+		case devTypeDef_rgbLampBelt:
+		case devTypeDef_rgbLampBulb:{
+
+			devDriverBussiness_rgbLamp_moudleInit();
+
+		}break;
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_GAS_DETECTOR)
+
+		case devTypeDef_gasDetect:{
+
+			devDriverBussiness_gasDetect_moudleInit();
+		}break;
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_SMOKE_DETECTOR)
+
+		case devTypeDef_smokeDetect:{
+
+			devDriverBussiness_smokeDetect_moudleInit();
+		}break;
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_PIR_DETECTOR)
+		
+		case devTypeDef_pirDetect:{
+
+			devDriverBussiness_pirDetect_moudleInit();
+		}break;
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_UART_MOUDLE)
+				
+		case devTypeDef_uartMoudle:{
+
+			devDriverBussiness_uartMoudle_moudleInit();
+		}break;
+#endif
 		default:break;
 	}
 
@@ -1275,7 +1708,7 @@ void devDriverManageBussiness_initialition(void){
 
 		devDriverBySlaveMCU_statusRecovery_flg = true;
 
-		currentDev_dataPointSet(&lanbon_l8device_currentDataPoint, false, false, true, false);
+		currentDev_dataPointSet(&lanbon_l8device_currentDataPoint, false, false, true, false, false);
 
 		switch(swCurrentDevType){
 
@@ -1298,9 +1731,24 @@ void devDriverManageBussiness_deinitialition(void){
 	devDriverBussiness_fansSwitch_moudleDeinit();
 	devDriverBussiness_heaterSwitch_moudleDeinit();
 	devDriverBussiness_thermostatSwitch_moudleDeinit();
-	devDriverBussiness_infraredSwitch_moudleDeinit();
 	devDriverBussiness_socketSwitch_moudleDeinit();
 	devDriverBussiness_scnarioSwitch_moudleDeinit();
+#if(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_INFRARED)
+	devDriverBussiness_infraredSwitch_moudleDeinit();
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_SOLAR_SYS_MANAGER)
+	devDriverBussiness_solarSysManager_moudleDeinit();
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RGBLAMP_BELT) ||\
+	 (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RGBLAMP_BULB)
+	devDriverBussiness_rgbLamp_moudleDeinit();
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_GAS_DETECTOR)
+	devDriverBussiness_gasDetect_moudleDeinit();
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_SMOKE_DETECTOR)
+	devDriverBussiness_smokeDetect_moudleDeinit();
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_PIR_DETECTOR)
+	devDriverBussiness_pirDetect_moudleDeinit();
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_UART_MOUDLE)
+	devDriverBussiness_uartMoudle_moudleDeinit();
+#endif
 }
 
 void devDriverManageBussiness_deviceChangeRefresh(void){

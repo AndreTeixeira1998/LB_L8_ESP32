@@ -36,8 +36,8 @@
 extern "C" {
 #endif
 
-#define MCONFIG_BLUFI_NAME_SIZE                  (20) /**< Contains the ending character */
-#define MCONFIG_BLUFI_CUSTOM_SIZE                (31) /**< BLE broadcast data packets have a valid length of up to 31 bytes */
+#define MCONFIG_BLUFI_NAME_SIZE                  (20)  /**< Contains the ending character */
+#define MCONFIG_BLUFI_CUSTOM_SIZE                (144) /**< BLE broadcast data packets have a valid length of up to 31 bytes */
 
 #define MDF_EVENT_MCONFIG_BLUFI_STARTED          (MDF_EVENT_MCONFIG_BASE + 0x200)
 #define MDF_EVENT_MCONFIG_BLUFI_STOPED           (MDF_EVENT_MCONFIG_BASE + 0x201)

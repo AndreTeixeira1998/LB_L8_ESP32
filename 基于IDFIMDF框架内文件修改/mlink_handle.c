@@ -391,16 +391,23 @@ static mdf_err_t mlink_handle_get_status(mlink_handle_data_t *handle_data)
 				mlink_json_pack(&tmp_str, "mac", (char *)mac_str);
 				mlink_json_pack(&tmp_str, "value", (int)devData_temp);
 
-#if(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_INFRARED)|\
-   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_SOCKET)|\
-   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_MOUDLE)
+#if(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RGBLAMP_BELT)||\
+   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RGBLAMP_BULB)||\
+   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_INFRARED)||\
+   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_SOCKET)||\
+   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_MOUDLE)||\
+   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RELAY_BOX)||\
+   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_GAS_DETECTOR)||\
+   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_SMOKE_DETECTOR)||\
+   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_PIR_DETECTOR)
 											
 				devBeepTips_trig(4, 8, 100, 40, 2); //beeps提示
+				
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_UART_MOUDLE)
+								//什么提示都没有
 #else
 				lvGui_wifiConfig_bussiness_configComplete_tipsTrig();
 #endif
-
-
 			}break;
 
             case CHARACTERISTIC_FORMAT_DOUBLE:
@@ -711,22 +718,21 @@ static mdf_err_t mlink_handle_set_mqttIp(mlink_handle_data_t *handle_data){
 	mdf_err_t ret = ESP_OK;
 	stt_mqttCfgParam dtMqttParamTemp = {
 	
-		.ip_remote = MQTT_REMOTE_DATATRANS_PARAM_IP_DEF,
+		.host_domain = MQTT_REMOTE_DATATRANS_PARAM_HOST_DEF,
 		.port_remote = MQTT_REMOTE_DATATRANS_PARAM_PORT_DEF,
 	};
-	char 	 paramInfoTemp_ip[32] = {0};
+	char 	 paramInfoTemp_host[MQTT_HOST_DOMAIN_STRLEN] = {0};
 	uint32_t paramInfoTemp_port = 0;
 
-    ret = mlink_json_parse(handle_data->req_data, "ip", paramInfoTemp_ip);
+	extern void lvGui_usrAppBussinessRunning_block(uint8_t iconType, const char *strTips, uint8_t timeOut);
+
+    ret = mlink_json_parse(handle_data->req_data, "ip", paramInfoTemp_host);
 	if(ret != ESP_OK){
 
 		printf("json rm ip format err.\n");
 		return ESP_OK;
 	}
-	sscanf(paramInfoTemp_ip, "%d.%d.%d.%d", (int *)&dtMqttParamTemp.ip_remote[0],
-											(int *)&dtMqttParamTemp.ip_remote[1],
-											(int *)&dtMqttParamTemp.ip_remote[2],
-											(int *)&dtMqttParamTemp.ip_remote[3]);
+	strcpy((char *)dtMqttParamTemp.host_domain, paramInfoTemp_host);
 	
 	ret = mlink_json_parse(handle_data->req_data, "port", &paramInfoTemp_port);
 	if(ret != ESP_OK){
@@ -737,13 +743,137 @@ static mdf_err_t mlink_handle_set_mqttIp(mlink_handle_data_t *handle_data){
 	dtMqttParamTemp.port_remote = paramInfoTemp_port;
 
 	mqttRemoteConnectCfg_paramSet(&dtMqttParamTemp, true);
-	printf("json req mqttIpSet, ip:%d.%d.%d.%d - port:%d.\n", dtMqttParamTemp.ip_remote[0],
-															  dtMqttParamTemp.ip_remote[1],
-															  dtMqttParamTemp.ip_remote[2],
-															  dtMqttParamTemp.ip_remote[3],
-															  dtMqttParamTemp.port_remote);
-	
+	lvGui_usrAppBussinessRunning_block(2, "\nserver changed", 6);
+	printf("json req mqttIpSet, host:%s - port:%d.\n", dtMqttParamTemp.host_domain,
+													   dtMqttParamTemp.port_remote);
+
+	//若是主机，就通知其他所有进行同样操作，并动态切换服务器
+	if(esp_mesh_get_layer() == MESH_ROOT){
+
+		//动态切换服务器
+		extern void dtRmoteServer_serverSwitchByDefault_trig(bool haServer_IF);
+		dtRmoteServer_serverSwitchByDefault_trig(false);
+	}
+															  
 	return ESP_OK;
+}
+
+static mdf_err_t mlink_handle_set_routerParam(mlink_handle_data_t *handle_data){
+
+	mdf_err_t ret = ESP_OK;
+
+	char router_ssid[32];
+	char router_password[64];
+	uint8_t router_bssid[6];
+	mwifi_config_t ap_config = {0x0};
+
+    ret = mlink_json_parse(handle_data->req_data, "ssid", router_ssid);
+	if(ret != ESP_OK){
+
+		printf("json router ssid format err.\n");
+		return ESP_OK;
+	}
+    ret = mlink_json_parse(handle_data->req_data, "bssid", (char *)router_bssid);
+	if(ret != ESP_OK){
+
+		printf("json router bssid format err.\n");
+		return ESP_OK;
+	}
+    ret = mlink_json_parse(handle_data->req_data, "psd", router_password);
+	if(ret != ESP_OK){
+
+		printf("json router psd format err.\n");
+		return ESP_OK;
+	}
+
+	//自身wifi信息修改
+	mdf_info_load("ap_config", &ap_config, sizeof(mwifi_config_t));
+	memcpy(ap_config.router_ssid, router_ssid, sizeof(char) * 32);
+	memcpy(ap_config.router_password, router_ssid, sizeof(char) * 64);
+	memcpy(ap_config.router_bssid, router_bssid, sizeof(uint8_t) * 6);
+	memcpy(ap_config.mesh_id, router_bssid, sizeof(uint8_t) * 6);
+	mdf_info_save("ap_config", &ap_config, sizeof(mwifi_config_t));
+
+	//若是主机，就通知其他所有进行同样操作
+	if(esp_mesh_get_layer() == MESH_ROOT){
+
+	}
+
+	//倒计时重启触发
+	usrApplication_systemRestartTrig(10);
+
+	return ESP_OK;
+}
+
+static mdf_err_t mlink_handle_set_mqttUsrInfo(mlink_handle_data_t *handle_data){
+
+	
+
+	return ESP_OK;
+}
+
+static mdf_err_t mlink_handle_set_mqttHaServerParam(mlink_handle_data_t *handle_data){
+
+	mdf_err_t ret = ESP_OK;
+	stt_mqttExServerCfgParam dtMqttParamTemp = {0};
+	char 	 paramInfoTemp_host[MQTT_HOST_DOMAIN_STRLEN] = {0};
+	uint32_t paramInfoTemp_port = 0;
+	char 	 paramInfoTemp_usrName[32] = {0};
+	char 	 paramInfoTemp_usrPsd[64] = {0};
+
+	extern void lvGui_usrAppBussinessRunning_block(uint8_t iconType, const char *strTips, uint8_t timeOut);
+
+    ret = mlink_json_parse(handle_data->req_data, "host", paramInfoTemp_host);
+	if(ret != ESP_OK){
+
+		printf("json rm ip format err.\n");
+		return ESP_OK;
+	}
+	strcpy((char *)dtMqttParamTemp.hostConnServer.host_domain, paramInfoTemp_host);
+	
+	ret = mlink_json_parse(handle_data->req_data, "port", &paramInfoTemp_port);
+	if(ret != ESP_OK){
+
+		printf("json rm port format err.\n");
+		return ESP_OK;
+	}
+	dtMqttParamTemp.hostConnServer.port_remote = paramInfoTemp_port;
+
+    ret = mlink_json_parse(handle_data->req_data, "username", paramInfoTemp_usrName);
+	if(ret != ESP_OK){
+
+		printf("json rm username format err.\n");
+		return ESP_OK;
+	}
+	strcpy((char *)dtMqttParamTemp.usrName, paramInfoTemp_usrName);
+
+
+    ret = mlink_json_parse(handle_data->req_data, "password", paramInfoTemp_usrPsd);
+	if(ret != ESP_OK){
+
+		printf("json rm password format err.\n");
+		return ESP_OK;
+	}
+	strcpy((char *)dtMqttParamTemp.usrPsd, paramInfoTemp_usrPsd);
+
+	mqttHaMqttServer_paramSet(&dtMqttParamTemp, true);
+	lvGui_usrAppBussinessRunning_block(2, "\nHA server changed", 6);
+	printf("json req mqttIpSet, host:%s - port:%d,\nusrname:%s, usrpsd:%s", 
+			dtMqttParamTemp.hostConnServer.host_domain,
+			dtMqttParamTemp.hostConnServer.port_remote,
+			dtMqttParamTemp.usrName,
+			dtMqttParamTemp.usrPsd);
+
+	//若是主机，就通知其他所有进行同样操作，并动态切换服务器
+	if(esp_mesh_get_layer() == MESH_ROOT){
+
+		//动态切换服务器
+		extern void dtRmoteServer_serverSwitchByDefault_trig(bool haServer_IF);
+		dtRmoteServer_serverSwitchByDefault_trig(true);
+	}
+															  
+	return ESP_OK;
+
 }
 
 static mdf_err_t mlink_handle_set_timeZone(mlink_handle_data_t *handle_data){
@@ -790,8 +920,11 @@ static mlink_handle_t g_handles_list[MLINK_HANDLES_MAX_SIZE] = {
     {"set_appTimer",  	 	mlink_handle_set_usrAppTrigTimer},
     {"set_backgroundPic",	mlink_handle_set_background},
     {"set_mqttIp",		 	mlink_handle_set_mqttIp},	
+    {"set_routerParam",		mlink_handle_set_routerParam},	
+    {"set_mqttUsrInfo",		mlink_handle_set_mqttUsrInfo},	
+    {"set_haMqtt",			mlink_handle_set_mqttHaServerParam},	
     {"set_timeZone",	 	mlink_handle_set_timeZone},
-    {NULL,              NULL},
+    {NULL,              	NULL},
 };
 
 mdf_err_t mlink_set_handle(const char *name, const mlink_handle_func_t func)

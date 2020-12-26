@@ -4,59 +4,62 @@
 
 #include "driver/i2c.h"
 
-/* freertos includes */
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/timers.h"
-#include "freertos/semphr.h"
-#include "freertos/queue.h"
-#include "freertos/event_groups.h"
-#include "esp_freertos_hooks.h"
 #include "esp_log.h"
 
-#define SENSOR_DS18B20_DATA_PIN						(25)
-#define SENSOR_DS18B20_PINCFG_PUTO()				gpio_set_direction(SENSOR_DS18B20_DATA_PIN, GPIO_MODE_OUTPUT)		
-#define SENSOR_DS18B20_PINCFG_PUTI()				gpio_set_direction(SENSOR_DS18B20_DATA_PIN, GPIO_MODE_INPUT)
-#define SENSOR_DS18B20_DATA_SET(x)					gpio_set_level(SENSOR_DS18B20_DATA_PIN, (uint32_t)x)
-#define SENSOR_DS18B20_DATA_GET()					gpio_get_level(SENSOR_DS18B20_DATA_PIN)
+#include "devDriver_temperatureMeasure.h"
 
-#define DEVDRIVER_INFRARED_IIC_SDA					(14)		
-#define DEVDRIVER_INFRARED_IIC_SCL					(27)
-#define DEVDRIVER_INFRARED_GPIO_HXD019D_RESET		(5)
-#define DEVDRIVER_INFRARED_GPIO_HXD019D_BUSY		(13)
+#if(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_INFRARED)
 
-#define HXD019D_PIN_RESET_LEVEL						0
+ #define SENSOR_DS18B20_DATA_PIN					(25)
+ #define SENSOR_DS18B20_PINCFG_PUTO()				gpio_set_direction(SENSOR_DS18B20_DATA_PIN, GPIO_MODE_OUTPUT);gpio_set_pull_mode(SENSOR_DS18B20_DATA_PIN, GPIO_PULLUP_ONLY)	
+ #define SENSOR_DS18B20_PINCFG_PUTI()				gpio_set_direction(SENSOR_DS18B20_DATA_PIN, GPIO_MODE_INPUT);gpio_set_pull_mode(SENSOR_DS18B20_DATA_PIN, GPIO_PULLUP_ONLY)
+ #define SENSOR_DS18B20_DATA_SET(x)					gpio_set_level(SENSOR_DS18B20_DATA_PIN, (uint32_t)x)
+ #define SENSOR_DS18B20_DATA_GET()					gpio_get_level(SENSOR_DS18B20_DATA_PIN)
 
-#define HXD019D_PIN_SDA_PINCFG_PUTO()				gpio_set_direction(DEVDRIVER_INFRARED_IIC_SDA, GPIO_MODE_OUTPUT)
-#define HXD019D_PIN_SDA_PINCFG_PUTI()				gpio_set_direction(DEVDRIVER_INFRARED_IIC_SDA, GPIO_MODE_INPUT)
+ #define DEVDRIVER_INFRARED_IIC_SDA					(14)		
+ #define DEVDRIVER_INFRARED_IIC_SCL					(27)
+ #define DEVDRIVER_INFRARED_GPIO_HXD019D_RESET		(5)
+ #define DEVDRIVER_INFRARED_GPIO_HXD019D_BUSY		(13)
 
-#define HXD019D_PIN_SDA_GET()						gpio_get_level(DEVDRIVER_INFRARED_IIC_SDA)
-#define HXD019D_PIN_BUSY_GET()						gpio_get_level(DEVDRIVER_INFRARED_GPIO_HXD019D_BUSY)
+ #define HXD019D_PIN_RESET_LEVEL					0
 
-#define HXD019D_PIN_SDA_SET(x)						gpio_set_level(DEVDRIVER_INFRARED_IIC_SDA, (uint32_t)x)
-#define HXD019D_PIN_SCL_SET(x)						gpio_set_level(DEVDRIVER_INFRARED_IIC_SCL, (uint32_t)x)
-#define HXD019D_PIN_RESET_SET(x)					gpio_set_level(DEVDRIVER_INFRARED_GPIO_HXD019D_RESET, (uint32_t)x)
+ #define HXD019D_PIN_SDA_PINCFG_PUTO()				gpio_set_direction(DEVDRIVER_INFRARED_IIC_SDA, GPIO_MODE_OUTPUT)
+ #define HXD019D_PIN_SDA_PINCFG_PUTI()				gpio_set_direction(DEVDRIVER_INFRARED_IIC_SDA, GPIO_MODE_INPUT)
 
-static const char *TAG = "lanbon_L8 - Infrared driver";
+ #define HXD019D_PIN_SDA_GET()						gpio_get_level(DEVDRIVER_INFRARED_IIC_SDA)
+ #define HXD019D_PIN_BUSY_GET()						gpio_get_level(DEVDRIVER_INFRARED_GPIO_HXD019D_BUSY)
 
-static TaskHandle_t tHandle_devInfraredProcess = NULL;
+ #define HXD019D_PIN_SDA_SET(x)						gpio_set_level(DEVDRIVER_INFRARED_IIC_SDA, (uint32_t)x)
+ #define HXD019D_PIN_SCL_SET(x)						gpio_set_level(DEVDRIVER_INFRARED_IIC_SCL, (uint32_t)x)
+ #define HXD019D_PIN_RESET_SET(x)					gpio_set_level(DEVDRIVER_INFRARED_GPIO_HXD019D_RESET, (uint32_t)x)
 
-static uint8_t irData_temp[DEVINFRARED_HXD019D_IIC_DATA_BUF_LEN] = {0};
+ static const char *TAG = "lanbon_L8 - Infrared driver";
 
-static bool devDriver_moudleInitialize_Flg = false;
+ static TaskHandle_t tHandle_devInfraredProcess = NULL;
 
-static enumInfrared_status theadStatus_infrared = infraredSMStatus_null;
-static uint8_t infrared_opToutLoop = 0;
+ static uint8_t irData_temp[DEVINFRARED_HXD019D_IIC_DATA_BUF_LEN] = {0};
+ static struct{
 
-static uint8_t infrared_currentOpreatRes = 0; //
-static uint8_t infrared_currentOpreatinsert = 0;
+	uint8_t dataCtrl:7;
+	uint8_t ctrlAvali_flg:1;
+}queueIrDataCtrl[DEVINFRARED_HXD019D_IR_CMD_QUEUE_LEN_MAX] = {0};
 
-static uint8_t infrared_timerTrigIstNumTab[USRAPP_VALDEFINE_TRIGTIMER_NUM] = {0};
+ static bool devDriver_moudleInitialize_Flg = false;
 
-static volatile uint16_t infraredAct_timeCounter = 0;
-static volatile uint16_t ds18b20_loopDetect_timeCounter = 0;
+ static enumInfrared_status theadStatus_infrared = infraredSMStatus_null;
+ static uint8_t infrared_opToutLoop = 0;
 
-static esp_err_t devInfrared_gpio_init(void){
+ static uint8_t infrared_currentOpreatRes = 0; 
+ static uint8_t infrared_currentOpreatinsert = 0;
+
+ static uint8_t infrared_timerTrigIstNumTab[USRAPP_VALDEFINE_TRIGTIMER_NUM] = {0};
+ 
+ static float infraredTemprature_ds18b20 = 0.0F;
+
+ static volatile uint16_t infraredAct_timeCounter = 0;
+ static volatile uint16_t ds18b20_loopDetect_timeCounter = 0;
+
+ static esp_err_t devInfrared_gpio_init(void){
 
 	esp_err_t ret = ERR_OK;
 	gpio_config_t io_conf = {0};
@@ -88,9 +91,9 @@ static esp_err_t devInfrared_gpio_init(void){
 	ret = gpio_config(&io_conf);
 
 	return ret;
-}
+ }
 
-static uint8_t GetACKSign(void) {
+ static uint8_t GetACKSign(void) {
 
 	uint8_t ACKSign = 0;
 
@@ -105,9 +108,9 @@ static uint8_t GetACKSign(void) {
 	ets_delay_us(135);
 
 	return ACKSign;
-}
+ }
 
-static void SendACKSign(void){
+ static void SendACKSign(void){
 
 	HXD019D_PIN_SDA_PINCFG_PUTO();
 	ets_delay_us(30);
@@ -117,26 +120,26 @@ static void SendACKSign(void){
 	HXD019D_PIN_SCL_SET(1);		
 	ets_delay_us(30);		
 	HXD019D_PIN_SCL_SET(0);
-}
+ }
 
-static void I2COpen(void)
-{	
+ static void I2COpen(void)
+ {	
 	HXD019D_PIN_SDA_PINCFG_PUTO();
 
 	HXD019D_PIN_SDA_SET(1);
 	HXD019D_PIN_SCL_SET(1);
-}
+ }
 
-static void I2CClose(void)   
-{
+ static void I2CClose(void)   
+ {
 	HXD019D_PIN_SDA_PINCFG_PUTO();
 
 	HXD019D_PIN_SDA_SET(1);
 	HXD019D_PIN_SCL_SET(1);
-}
+ }
 
-static void I2CStart(void) 
-{
+ static void I2CStart(void) 
+ {
 	HXD019D_PIN_SDA_PINCFG_PUTO();
 	HXD019D_PIN_SDA_SET(1);
 	HXD019D_PIN_SCL_SET(1);
@@ -147,10 +150,10 @@ static void I2CStart(void)
 
 	HXD019D_PIN_SCL_SET(0);
 	ets_delay_us(65);
-}
+ }
 
-static void I2CStop(void)
-{
+ static void I2CStop(void)
+ {
 	HXD019D_PIN_SDA_PINCFG_PUTO();
 	HXD019D_PIN_SDA_SET(0);
 	HXD019D_PIN_SCL_SET(0);
@@ -161,10 +164,10 @@ static void I2CStop(void)
 
 	HXD019D_PIN_SDA_SET(1);
 	ets_delay_us(30);
-}
-
-static void I2CWriteData(uint8_t bData)
-{
+ }
+ 
+ static void I2CWriteData(uint8_t bData)
+ {
 	uint8_t loop = 0,
 		    ACKSign = 0,
 		    bitOpreat = 0;
@@ -191,10 +194,10 @@ static void I2CWriteData(uint8_t bData)
 	}
 	
 	ACKSign = GetACKSign();
-}
+ }
 
-static void writeI2C(char *data2, uint8_t count)
-{
+ static void writeI2C(char *data2, uint8_t count)
+ {
 	uint8_t i = 0;
 	uint8_t j = 0;
 	char iBuffer = 0;
@@ -225,10 +228,10 @@ static void writeI2C(char *data2, uint8_t count)
 
 	I2CClose();
 	ets_delay_us(30);
-}
-
-static void Learn_start(void)
-{
+ }
+ 
+ static void Learn_start(void)
+ {
 		
 	I2COpen();
 	ets_delay_us(30);
@@ -256,10 +259,10 @@ static void Learn_start(void)
 
 	I2CClose();
 	ets_delay_us(30);
-}
+ }
 
-static void I2CReadData(uint8_t* pbData)
-{
+ static void I2CReadData(uint8_t* pbData)
+ {
 	uint8_t readdata = 0;
 	uint8_t i=8;
 
@@ -283,10 +286,10 @@ static void I2CReadData(uint8_t* pbData)
 
 	SendACKSign();
 	ets_delay_us(65);
-}
+ }
 
-static void readI2C(char* readtempbuf) 
-{
+ static void readI2C(char* readtempbuf) 
+ {
 	uint8_t bValue;
 	uint8_t i=0;
 	uint8_t checksum;
@@ -349,27 +352,27 @@ static void readI2C(char* readtempbuf)
 	ets_delay_us(30);
 	I2CClose();
 	ets_delay_us(30);
-}
+ }
 
-static esp_err_t devInfrared_IICopreat_irControl(void){
+ static esp_err_t devInfrared_IICopreat_irControl(void){
 
 	esp_err_t ret = ERR_OK;
 
 	writeI2C((char *)irData_temp, 232);
 
 	return ret;
-}
+ }
 
-static esp_err_t devInfrared_IICopreat_irLearn_stepA(void){
+ static esp_err_t devInfrared_IICopreat_irLearn_stepA(void){
 
 	esp_err_t ret = ERR_OK;
 
 	Learn_start();
 
 	return ret;
-}
+ }
 
-static esp_err_t devInfrared_IICopreat_irLearn_stepB(void){
+ static esp_err_t devInfrared_IICopreat_irLearn_stepB(void){
 
 	esp_err_t ret = ERR_OK;
 
@@ -393,9 +396,9 @@ static esp_err_t devInfrared_IICopreat_irLearn_stepB(void){
 	deviceDatapointSynchronousReport_actionTrig(); //状态同步通知
 
 	return ret;
-}
+ }
 
-static void devInfrared_opreatAct_learnningStart(uint8_t opInsert){
+ static void devInfrared_opreatAct_learnningStart(uint8_t opInsert){
 
 	HXD019D_PIN_RESET_SET(!HXD019D_PIN_RESET_LEVEL); //
 
@@ -414,9 +417,9 @@ static void devInfrared_opreatAct_learnningStart(uint8_t opInsert){
 		theadStatus_infrared = infraredSMStatus_learnningSTBY; //注意顺序，顺序在最后最佳	
 		infrared_currentOpreatinsert = opInsert;
 	}
-}
+ }
 
-static void devInfrared_opreatAct_remoteControlStart(uint8_t opInsert){
+ static void devInfrared_opreatAct_remoteControlStart(uint8_t opInsert){
 
 	stt_infraredSwitchData_nvsOpreat *dataTemp = NULL;
 
@@ -430,9 +433,9 @@ static void devInfrared_opreatAct_remoteControlStart(uint8_t opInsert){
 
 	os_free(dataTemp);
 	dataTemp = NULL;
-}
+ }
 
-static bool sensorDs18b20_opreat_rst(void){
+ static bool sensorDs18b20_opreat_rst(void){
 
 	bool ret = false;
 
@@ -444,26 +447,26 @@ static bool sensorDs18b20_opreat_rst(void){
 
 	SENSOR_DS18B20_PINCFG_PUTI();
 	ret = SENSOR_DS18B20_DATA_GET();
-	ets_delay_us(400);
+	ets_delay_us(450);
 
 	SENSOR_DS18B20_PINCFG_PUTO();
 	SENSOR_DS18B20_DATA_SET(1);
 	
 	return ret ;
-}
+ }
 
-static void sensorDs18b20_opreat_writeBit(bool dBit){
+ static void sensorDs18b20_opreat_writeBit(bool dBit){
 
 	SENSOR_DS18B20_PINCFG_PUTO();
 	SENSOR_DS18B20_DATA_SET(0);
-	ets_delay_us(2);
+	ets_delay_us(1);
 	SENSOR_DS18B20_DATA_SET((uint32_t)dBit);
 	ets_delay_us(60);
 	SENSOR_DS18B20_DATA_SET(1);	
-}
+ }
 
-static void sensorDs18b20_opreat_writebyte(uint8_t dByte)
-{
+ static void sensorDs18b20_opreat_writebyte(uint8_t dByte)
+ {
 	uint8_t loop = 0;
 
 	for(loop = 0; loop < 8; loop ++){
@@ -471,30 +474,30 @@ static void sensorDs18b20_opreat_writebyte(uint8_t dByte)
 		sensorDs18b20_opreat_writeBit(dByte & 0x01);
 		dByte >>= 1;
 	}
-}
+ }
 
-static bool sensorDs18b20_opreat_readBit(void)
-{
+ static bool sensorDs18b20_opreat_readBit(void)
+ {
 	bool dBit = false;
 
 	SENSOR_DS18B20_PINCFG_PUTO();
 	SENSOR_DS18B20_DATA_SET(0);
-	ets_delay_us(2);
+	ets_delay_us(1);
 	SENSOR_DS18B20_DATA_SET(1);
-	ets_delay_us(6);
+	ets_delay_us(4);
 
 	SENSOR_DS18B20_PINCFG_PUTI();
 	dBit = SENSOR_DS18B20_DATA_GET();
-	ets_delay_us(40);
+	ets_delay_us(45);
 
 	SENSOR_DS18B20_PINCFG_PUTO();
 	SENSOR_DS18B20_DATA_SET(1);
 	
 	return dBit;
-}
+ }
 
-static uint8_t sensorDs18b20_opreat_readByte(void)
-{
+ static uint8_t sensorDs18b20_opreat_readByte(void)
+ {
 	uint8_t dByte = 0,
 			dTemp = 0;
 	uint8_t loop = 0;
@@ -506,17 +509,17 @@ static uint8_t sensorDs18b20_opreat_readByte(void)
 	}
 	
 	return dByte;
-}
+ }
 
-static void sensorDs18b20_opreat_sweap(void){
+ static void sensorDs18b20_opreat_sweap(void){
 
 	sensorDs18b20_opreat_rst();
 	ets_delay_us(2);
 	sensorDs18b20_opreat_writebyte(0xcc);
 	sensorDs18b20_opreat_writebyte(0x44);
-}
+ }
 
-static uint16_t sensorDs18b20_opreat_tempRead(void){
+ static uint16_t sensorDs18b20_opreat_tempRead(void){
 
 	uint16_t a = 0,
 			 b = 0,
@@ -542,7 +545,7 @@ static uint16_t sensorDs18b20_opreat_tempRead(void){
 		 temp |= a;
 		 temp = ((~temp) + 1);
 		 ftemp = temp * 0.0625F * 100.0F + 0.5F;
-		 t = ftemp;
+		 t = (uint16_t)ftemp;
 		 flag = true;
 	}
 	else
@@ -552,12 +555,18 @@ static uint16_t sensorDs18b20_opreat_tempRead(void){
 		flag = false;
 	}
 
+	if(ftemp > 60 || ftemp < -20);
+	else{
+
+		infraredTemprature_ds18b20 = ftemp;
+	}
+
 	ESP_LOGI(TAG, "ds18b20 temp:%.1f c\n", ftemp);
 	
 	return t;
-}
+ }
 
-static void devInfrared_opreatAct_stop(void){
+ static void devInfrared_opreatAct_stop(void){
 
 	HXD019D_PIN_RESET_SET(HXD019D_PIN_RESET_LEVEL);
 	
@@ -569,11 +578,12 @@ static void devInfrared_opreatAct_stop(void){
 
 	infraredAct_timeCounter = DEVINFRARED_HXD019D_resetOpreatTimeKeep; //
 	theadStatus_infrared = infraredSMStatus_opStop;
-}
+ }
 
-static void devDriverTask_infraredSwitch_process(void *arg){
+ static void devDriverTask_infraredSwitch_process(void *arg){
 
 	const uint16_t sensorDs18b20_detectPeriod = 10000;
+	const uint16_t processTaskIdlePeriod = 50;
 
 	static enumInfrared_status localTheadStatus_infrared = infraredSMStatus_null;
 	static struct{
@@ -608,6 +618,26 @@ static void devDriverTask_infraredSwitch_process(void *arg){
 
 				paramTimer_irLearnTout.toutTrig_flg = 0;
 
+				static stt_timerLoop tmrIrQueueExcute = { //IR命令执行队列任务
+					.loopPeriod = 1500 / processTaskIdlePeriod,
+					.loopCounter = 0,
+				};
+
+				if(tmrIrQueueExcute.loopCounter < tmrIrQueueExcute.loopPeriod)tmrIrQueueExcute.loopCounter ++; //队列执行间隔
+				else{
+					
+					tmrIrQueueExcute.loopCounter = 0;
+
+					uint8_t loop = 0;
+					for(loop = 0; loop < DEVINFRARED_HXD019D_IR_CMD_QUEUE_LEN_MAX; loop ++){
+						if(1 == queueIrDataCtrl[loop].ctrlAvali_flg){
+							queueIrDataCtrl[loop].ctrlAvali_flg = 0;
+							devInfrared_opreatAct_remoteControlStart(queueIrDataCtrl[loop].dataCtrl);
+							break;
+						}
+					}	
+				}
+				
 			}break;
 			
 			case infraredSMStatus_learnningSTBY:{
@@ -703,66 +733,105 @@ static void devDriverTask_infraredSwitch_process(void *arg){
 			}break;
 		}
 
-		 vTaskDelay(pdMS_TO_TICKS(50));
+		 vTaskDelay(pdMS_TO_TICKS(processTaskIdlePeriod));
 	}
 
 	vTaskDelete(NULL);
-}
+ }
 
-static void devDriverBussiness_infraredSwitch_periphInit(void){
+ static void devDriverBussiness_infraredSwitch_periphInit(void){
 
 	devTypeDef_enum swCurrentDevType = currentDev_typeGet();
 
 	if(swCurrentDevType != devTypeDef_infrared)return;
 
 	ESP_ERROR_CHECK(devInfrared_gpio_init());
-}
+ }
 
-static void devDriverBussiness_infraredSwitch_periphDeinit(void){
+ static void devDriverBussiness_infraredSwitch_periphDeinit(void){
 	
 	gpio_reset_pin( DEVDRIVER_INFRARED_IIC_SDA);
 	gpio_reset_pin( DEVDRIVER_INFRARED_IIC_SCL);
 	gpio_reset_pin( DEVDRIVER_INFRARED_GPIO_HXD019D_RESET);
 	gpio_reset_pin( DEVDRIVER_INFRARED_GPIO_HXD019D_BUSY);
-}
+ }
 
-void devDriverBussiness_infraredSwitch_timerUpTrigIstTabSet(uint8_t istTab[USRAPP_VALDEFINE_TRIGTIMER_NUM], bool nvsRecord_IF){
+ float devDriverBussiness_tempMeasureByDs18b20_get(void){
+
+	return infraredTemprature_ds18b20;
+ }
+
+ void devDriverBussiness_tempMeasureByDs18b20_getByHex(stt_devTempParam2Hex *param){
+
+	const float decimal_prtCoefficient = 100.0F; //小数计算偏移倍数 --100倍对应十进制两位
+	float tempratureCaculate_temp = infraredTemprature_ds18b20 + DEVDRIVER_TEMPERATUREMEASURE_NEGATIVE_BOUND;
+	
+	uint16_t dataInteger_prt = (uint16_t)tempratureCaculate_temp & 0xFFFF;
+	uint8_t dataDecimal_prt = (uint8_t)((tempratureCaculate_temp - (float)dataInteger_prt) * decimal_prtCoefficient);
+
+	if(infraredTemprature_ds18b20 < 0.0F)dataDecimal_prt = 99 - dataDecimal_prt; //针对负数处理
+
+	param->integer_h8bit = (uint8_t)((dataInteger_prt & 0xFF00) >> 8);
+	param->integer_l8bit = (uint8_t)((dataInteger_prt & 0x00FF) >> 0);
+	param->decimal_8bit = dataDecimal_prt;
+ }
+
+ void infraredOpreatActRemoteControlCmdLineUp(uint8_t cmdIndex){
+
+	uint8_t loop = 0;
+	
+	for(loop = 0; loop < DEVINFRARED_HXD019D_IR_CMD_QUEUE_LEN_MAX; loop ++){
+		if(0 == queueIrDataCtrl[loop].ctrlAvali_flg){
+			queueIrDataCtrl[loop].ctrlAvali_flg = 1;
+			queueIrDataCtrl[loop].dataCtrl = cmdIndex;
+			break;
+		}
+	}
+
+	if(loop == DEVINFRARED_HXD019D_IR_CMD_QUEUE_LEN_MAX){
+		memset(queueIrDataCtrl, 0, sizeof(queueIrDataCtrl));
+		ESP_LOGI(TAG, "infrared cmdQueue full.");
+	}
+ }
+
+ void devDriverBussiness_infraredSwitch_timerUpTrigIstTabSet(uint8_t istTab[USRAPP_VALDEFINE_TRIGTIMER_NUM], bool nvsRecord_IF){
 
 	memcpy(infrared_timerTrigIstNumTab, istTab, sizeof(uint8_t) * USRAPP_VALDEFINE_TRIGTIMER_NUM);
 	if(nvsRecord_IF){
 
 		devSystemInfoLocalRecord_save(saveObj_devInfrared_timerUpIstTab, infrared_timerTrigIstNumTab);
 	}
-}
+ }
 
-void devDriverBussiness_infraredSwitch_timerUpTrigIstTabGet(uint8_t istTab[USRAPP_VALDEFINE_TRIGTIMER_NUM]){
+ void devDriverBussiness_infraredSwitch_timerUpTrigIstTabGet(uint8_t istTab[USRAPP_VALDEFINE_TRIGTIMER_NUM]){
 
 	memcpy(istTab, infrared_timerTrigIstNumTab, sizeof(uint8_t) * USRAPP_VALDEFINE_TRIGTIMER_NUM);
-}
+ }
 
-uint8_t IRAM_ATTR devDriverBussiness_infraredSwitch_runningDetectLoop(void){
+ uint8_t IRAM_ATTR devDriverBussiness_infraredSwitch_runningDetectLoop(void){
 
 	if(infraredAct_timeCounter)infraredAct_timeCounter --;
 	if(ds18b20_loopDetect_timeCounter)ds18b20_loopDetect_timeCounter --;
 
 	return (infraredAct_timeCounter / 1000);
-}
+ }
 
-uint8_t devDriverBussiness_infraredSwitch_currentOpreatNumGet(void){
+ uint8_t devDriverBussiness_infraredSwitch_currentOpreatNumGet(void){
 
 	ESP_LOGI(TAG, "infrared opreat res get:%d.\n", infrared_currentOpreatRes);
 
 	return infrared_currentOpreatRes;
-}
+ }
 
-void devDriverBussiness_infraredSwitch_moudleInit(void){
+ void devDriverBussiness_infraredSwitch_moudleInit(void){
 
 	devTypeDef_enum swCurrentDevType = currentDev_typeGet();
 
 	if(swCurrentDevType != devTypeDef_infrared)return;
 	if(devDriver_moudleInitialize_Flg)return;
 
-	esp_log_level_set(TAG, ESP_LOG_INFO);
+//	esp_log_level_set(TAG, ESP_LOG_INFO);
+	esp_log_level_set(TAG, ESP_LOG_WARN);
 
 	devDriverBussiness_infraredSwitch_periphInit();
 	
@@ -774,9 +843,9 @@ void devDriverBussiness_infraredSwitch_moudleInit(void){
 				&tHandle_devInfraredProcess);
 
 	devDriver_moudleInitialize_Flg = true;
-}
+ }
 
-void devDriverBussiness_infraredSwitch_moudleDeinit(void){
+ void devDriverBussiness_infraredSwitch_moudleDeinit(void){
 
 	if(!devDriver_moudleInitialize_Flg)return;
 
@@ -784,14 +853,14 @@ void devDriverBussiness_infraredSwitch_moudleDeinit(void){
 	vTaskDelete(tHandle_devInfraredProcess);
 
 	devDriver_moudleInitialize_Flg = false;
-}
+ }
 
-enumInfrared_status devDriverBussiness_infraredStatus_get(void){
+ enumInfrared_status devDriverBussiness_infraredStatus_get(void){
 
 	return theadStatus_infrared;
-}
+ }
 
-void devDriverBussiness_infraredSwitch_periphStatusReales(stt_devDataPonitTypedef *param){
+ void devDriverBussiness_infraredSwitch_periphStatusReales(stt_devDataPonitTypedef *param){
 
 	devTypeDef_enum swCurrentDevType = currentDev_typeGet();
 
@@ -806,9 +875,12 @@ void devDriverBussiness_infraredSwitch_periphStatusReales(stt_devDataPonitTypede
 		else
 		{
 			devInfrared_opreatAct_remoteControlStart(param->devType_infrared.devInfrared_irIst);
+//			infraredOpreatActRemoteControlCmdLineUp(param->devType_infrared.devInfrared_irIst);
 		}
 	}
-}
+ }
+
+#endif
 
 
 

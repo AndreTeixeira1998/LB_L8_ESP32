@@ -1,14 +1,5 @@
 #include "mechanical_bussinessOpreat.h"
 
-/* freertos includes */
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/timers.h"
-#include "freertos/semphr.h"
-#include "freertos/queue.h"
-#include "freertos/event_groups.h"
-#include "esp_freertos_hooks.h"
-
 #include "mdf_common.h"
 #include "mwifi.h"
 #include "mlink.h"
@@ -24,6 +15,9 @@
 #elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_SOCKET)
 
  #define DEV_SOCKET_USR_KEY_PIN			(4)	
+
+ #define DEV_SOCKET_USR_DEVDEF_PIN_C0	(19)
+ #define DEV_SOCKET_USR_DEVDEF_PIN_C1	(18)
 
 #elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_MOUDLE)
 
@@ -45,6 +39,31 @@
  #define DEV_MOUDLE_DCODE_FLGVAL_FUNC_C  0x08
  #define DEV_MOUDLE_DCODE_FLGVAL_FUNC_D  0x04
  #define DEV_MOUDLE_DCODE_FLGVAL_FUNC_E  0x03
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RELAY_BOX)
+
+ #define DEV_RELAY_USR_KEY_PIN			(4)
+
+ #define DEV_RELAY_USR_DEVDEF_PIN_C0	(26)
+
+ #define DEV_RELAY_DCODE_FLGVAL_FUNC_A	 0
+ #define DEV_RELAY_DCODE_FLGVAL_FUNC_B	 1
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RGBLAMP_BELT)||\
+	 (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RGBLAMP_BULB)
+
+ #define DEV_RGBLAMP_USR_KEY_PIN		(4)
+
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_GAS_DETECTOR)
+
+ #define DEV_GAS_DETECTOR_USR_KEY_PIN	DEVDRIVER_GASDETECTOR_GPIO_INPUT_USRKEY
+
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_SMOKE_DETECTOR)
+
+ #define DEV_SMOKE_DETECTOR_USR_KEY_PIN	DEVDRIVER_SMOKEDETECTOR_GPIO_INPUT_USRKEY
+
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_PIR_DETECTOR)
+
+ #define DEV_PIR_DETECTOR_USR_KEY_PIN	DEVDRIVER_PIRDETECTOR_GPIO_INPUT_USRKEY
+ 
 #endif
 
 static uint8_t 	val_dcode_Local = 0;
@@ -59,6 +78,11 @@ static uint8_t  buttonContinue_rcd = 1;
 
 static param_combinationFunPreTrig param_combinationFunTrigger_3S1L = {0},
 								   param_combinationFunTrigger_3S5S = {0};
+
+#if(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_SOCKET)
+	
+ void devSocketAttrOpreat_specificationSet(enumSpecification_socketType spe);
+#endif
 
 static void mechOpreatDevDatapoint_opreatNormal(uint8_t devCtrlVal){
 
@@ -156,7 +180,7 @@ static void mechOpreatDevDatapoint_opreatNormal(uint8_t devCtrlVal){
 
 	if(devOpReserve_flg){
 
-		currentDev_dataPointSet(&devDataPoint_setTemp, true, true, true, true);
+		currentDev_dataPointSet(&devDataPoint_setTemp, true, true, true, true, true);
 	}
 }
 
@@ -174,7 +198,7 @@ static void mechOpreatUsrKey_opreatShort(void){
 //	devDataPoint_temp.devType_infrared.devInfrared_actCmd = optFlg;
 //	devDataPoint_temp.devType_infrared.devInfrared_irIst = 127;
 
-//	currentDev_dataPointSet(&devDataPoint_temp, false, false, true, true);
+//	currentDev_dataPointSet(&devDataPoint_temp, false, false, true, true, true);
 
 #elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_SOCKET)
 
@@ -184,27 +208,78 @@ static void mechOpreatUsrKey_opreatShort(void){
 	currentDev_dataPointGet(&devDataPoint_getTemp);
 	devDataPoint_setTemp.devType_socket.devSocket_opSw =\
 		!devDataPoint_getTemp.devType_socket.devSocket_opSw;
-	currentDev_dataPointSet(&devDataPoint_setTemp, true, true, true, true);
-
+	currentDev_dataPointSet(&devDataPoint_setTemp, true, true, true, true, true);
 #elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_MOUDLE)
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RELAY_BOX)
 
+	stt_devDataPonitTypedef devDataPoint_getTemp = {0};
+	stt_devDataPonitTypedef devDataPoint_setTemp = {0};
+
+	currentDev_dataPointGet(&devDataPoint_getTemp);	
+	switch(currentDev_typeGet()){
+		case devTypeDef_relayBox_1bit:
+			devDataPoint_setTemp.devType_mulitSwitch_oneBit.swVal_bit1 =\
+				!devDataPoint_getTemp.devType_mulitSwitch_oneBit.swVal_bit1;
+			currentDev_dataPointSet(&devDataPoint_setTemp, true, true, true, true, true);
+			break;
+		case devTypeDef_relayBox_curtain:{
+			static bool rcdState = false;
+			rcdState = !rcdState;
+			(true == rcdState)?
+				(devDataPoint_setTemp.devType_curtain.devCurtain_actEnumVal = curtainRunningStatus_cTact_open):
+				(devDataPoint_setTemp.devType_curtain.devCurtain_actEnumVal = curtainRunningStatus_cTact_close);
+			devDataPoint_setTemp.devType_curtain.devCurtain_actMethod = 0;
+			currentDev_dataPointSet(&devDataPoint_setTemp, true, true, true, true, true);
+		}break;
+		default:break;
+	}
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RGBLAMP_BELT)||\
+	 (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RGBLAMP_BULB)
+	
+	stt_devDataPonitTypedef devDataPoint_getTemp = {0};
+	stt_devDataPonitTypedef devDataPoint_setTemp = {0};
+
+	currentDev_dataPointGet(&devDataPoint_getTemp);
+	devDataPoint_setTemp.devType_rgbLamp.devRgbLamp_enable =\
+		!devDataPoint_getTemp.devType_rgbLamp.devRgbLamp_enable;
+	currentDev_dataPointSet(&devDataPoint_setTemp, true, true, true, true, true);
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_SMOKE_DETECTOR)
+
+	devDriverBussinessSmokeDetect_detectInterruptEnable_set(true);
 #endif
 }
 
 static void mechOpreatUsrKey_opreatLongA(void){
 
-#if(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_INFRARED)
-
-#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_SOCKET)
-
-#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_MOUDLE)
-
+#if(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_INFRARED)||\
+   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_SOCKET)||\
+   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_MOUDLE)||\
+   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RELAY_BOX)
+	
+	devTipsStatusRunning_abnormalTrig(tipsRunningStatus_funcTrig, 2);
+	
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RGBLAMP_BELT)||\
+	 (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RGBLAMP_BULB)
+	
+	devDriverBussiness_rgbLamp_tipsTrig(rgbLampTipsType_a, 2);
+	
 #endif
 
 	mdf_info_erase("ESP-MDF");
+	devSystemInfoLocalRecord_allErase();
+
+#if(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_GAS_DETECTOR)||\
+   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_SMOKE_DETECTOR)
+   	devBeepTips_trig(4, 8, 50, 25, 4); //报警设备不做重启,因为会重复睡眠重启
+   
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_PIR_DETECTOR)
+	devBeepTips_trig(4, 8, 50, 25, 4); //红外需要重启，因为有人在旁边配网，导致无法进入睡眠	
 	usrApplication_systemRestartTrig(3);
-	devTipsStatusRunning_abnormalTrig(tipsRunningStatus_funcTrig, 2);
-	devBeepTips_trig(4, 8, 500, 100, 2);
+	
+#else
+	devBeepTips_trig(4, 8, 500, 100, 2);	
+	usrApplication_systemRestartTrig(3);
+#endif
 }
 
 static void mechOpreatUsrKey_opreatLongB(void){
@@ -220,12 +295,18 @@ static void mechOpreatUsrKey_opreatLongB(void){
 	devBeepTips_trig(4, 8, 100, 40, 2);
 }
 
-static uint8_t mechOpreatDetect_dcodeValGet(void){
+static uint8_t mechOpreatDetect_dcodeValGet(void){ //低电平为 1，高电平为 0
 
 	uint8_t valDcode = 0;
 
 #if(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_INFRARED)
 #elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_SOCKET)
+	
+	if(!gpio_get_level(DEV_SOCKET_USR_DEVDEF_PIN_C0))valDcode |= 1 << 0;
+	else valDcode &= ~(1 << 0);
+
+	if(!gpio_get_level(DEV_SOCKET_USR_DEVDEF_PIN_C1))valDcode |= 1 << 1;
+	else valDcode &= ~(1 << 1);
 #elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_MOUDLE)
 
 	if(!gpio_get_level(DEV_MOUDLE_DCODE_6_PIN))valDcode |= 1 << 0;
@@ -245,6 +326,10 @@ static uint8_t mechOpreatDetect_dcodeValGet(void){
 
 	if(!gpio_get_level(DEV_MOUDLE_DCODE_1_PIN))valDcode |= 1 << 5;
 	else valDcode &= ~(1 << 5);
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RELAY_BOX)
+
+	if(!gpio_get_level(DEV_RELAY_USR_DEVDEF_PIN_C0))valDcode |= 1 << 0;
+	else valDcode &= ~(1 << 0);
 #endif
 
 	return valDcode;
@@ -252,7 +337,7 @@ static uint8_t mechOpreatDetect_dcodeValGet(void){
 
 static void mechOpreatDetect_dcodeScanning(void){
 
-	const  uint8_t	comfirm_Period	= 200;	//
+	const  uint8_t	comfirm_Period	= 200;	//消抖
 
 	uint8_t  val_dcode_differ	 	= 0,
 			 val_dcodeTmp		 	= 0;
@@ -288,6 +373,33 @@ static void mechOpreatDetect_dcodeScanning(void){
 
 #if(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_INFRARED)
 #elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_SOCKET)
+
+	if(val_CHG){
+
+		val_CHG	= false;
+
+		val_dcode_differ 	= val_dcode_Local ^ val_dcodeCfm;
+		val_dcode_Local 	= val_dcodeCfm	  = val_dcodeTmp;
+
+		switch(val_dcodeCfm){
+
+			case 0:{ //美规
+
+				devSocketAttrOpreat_specificationSet(socketTypeSpecifi_America);
+
+			}break;
+
+			case 2:{ //常规
+
+				devSocketAttrOpreat_specificationSet(socketTypeSpecifi_General);
+
+			}break;
+
+			default:{}break;
+		}
+
+		printf("devSocket type defCode chg:%02X.\n", val_dcode_Local);
+	}
 #elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_MOUDLE)
 
 	if(val_CHG){
@@ -297,7 +409,7 @@ static void mechOpreatDetect_dcodeScanning(void){
 		val_dcode_differ 	= val_dcode_Local ^ val_dcodeCfm;
 		val_dcode_Local 	= val_dcodeCfm	  = val_dcodeTmp;
 		
-		devBeepTips_trig(4, 8, 100, 40, 2);
+		devBeepTips_trig(4, 8, 100, 40, 2);	
 
 		printf("dcode chg:%02X.\n", val_dcode_Local);
 		
@@ -375,6 +487,29 @@ static void mechOpreatDetect_dcodeScanning(void){
 //			printf("devType:%02X.\n", currentDev_typeGet());
 		}
 	}	
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RELAY_BOX)
+
+	if(val_CHG){
+
+		val_CHG	= false;
+
+		val_dcode_differ 	= val_dcode_Local ^ val_dcodeCfm;
+		val_dcode_Local 	= val_dcodeCfm	  = val_dcodeTmp;
+
+		switch(val_dcodeCfm){
+
+			case DEV_RELAY_DCODE_FLGVAL_FUNC_A: currentDev_typeSet(devTypeDef_relayBox_1bit, false);
+					break;
+			case DEV_RELAY_DCODE_FLGVAL_FUNC_B: currentDev_typeSet(devTypeDef_relayBox_curtain, false);
+					break;
+			default:break;
+		}
+		
+		devDriverManageBussiness_deviceChangeRefresh(); //驱动更新
+		devSystemInfoLocalRecord_normalClear();
+
+		printf("devRelayBox type defCode chg:%02X.\n", val_dcode_Local);
+	}
 #endif
 }
 
@@ -608,6 +743,18 @@ static bool mechOpreatDetect_usrKeyValGet(void){
 	valKey = !gpio_get_level(DEV_SOCKET_USR_KEY_PIN);
 #elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_MOUDLE)
 	valKey = !gpio_get_level(DEV_MOUDLE_USR_KEY_PIN);
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RELAY_BOX)
+	valKey = !gpio_get_level(DEV_RELAY_USR_KEY_PIN);
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RGBLAMP_BELT)||\
+	 (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RGBLAMP_BULB)
+	valKey = !gpio_get_level(DEV_RGBLAMP_USR_KEY_PIN);
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_GAS_DETECTOR)
+	valKey = gpio_get_level(DEV_GAS_DETECTOR_USR_KEY_PIN);
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_SMOKE_DETECTOR)
+	valKey = gpio_get_level(DEV_SMOKE_DETECTOR_USR_KEY_PIN);
+	if(valKey)devDriverBussinessSmokeDetect_detectInterruptEnable_set(false);
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_PIR_DETECTOR)
+	valKey = !gpio_get_level(DEV_PIR_DETECTOR_USR_KEY_PIN);
 #endif
 	
 	return valKey;
@@ -682,9 +829,15 @@ static void mechOpreatDetect_usrKeyScanning(void){
 
 void devMechanicalOpreatTimeCounter_realesing(void){
 
-#if(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_INFRARED)|\
-   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_SOCKET)|\
-   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_MOUDLE)
+#if	(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_INFRARED)||\
+	(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_SOCKET)||\
+	(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_MOUDLE)||\
+	(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RELAY_BOX)||\
+	(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RGBLAMP_BELT)||\
+	(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RGBLAMP_BULB)||\
+	(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_GAS_DETECTOR)||\
+	(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_SMOKE_DETECTOR)||\
+	(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_PIR_DETECTOR)
 
 	COUNTER_COUNTING_DOWN_LEGAL_U16(edCounter_usrKey)
 	COUNTER_COUNTING_DOWN_LEGAL_U16(edCounter_button)
@@ -711,7 +864,7 @@ static void task_devOpreating_detecting(void *pvParameter){
 	}
 }
 
-void deviceTypeDefineByDcode_preScanning(void){
+void deviceTypeDefineByDcode_preScanning(void){ //需要预扫描用以更新硬件驱动
 
 	val_dcode_Local = mechOpreatDetect_dcodeValGet();
 
@@ -728,7 +881,16 @@ void deviceTypeDefineByDcode_preScanning(void){
 
 		stt_devStatusRecord devStatusRecordFlg_temp = {0};
 
+		devStatusRecordIF_paramGet(&devStatusRecordFlg_temp);
 		devStatusRecordFlg_temp.devStatusOnOffRecord_IF = 1;
+		devStatusRecordIF_paramSet(&devStatusRecordFlg_temp, false);
+	}
+	else{
+		
+		stt_devStatusRecord devStatusRecordFlg_temp = {0};
+		
+		devStatusRecordIF_paramGet(&devStatusRecordFlg_temp);
+		devStatusRecordFlg_temp.devStatusOnOffRecord_IF = 0;
 		devStatusRecordIF_paramSet(&devStatusRecordFlg_temp, false);
 	}
 
@@ -758,7 +920,17 @@ void deviceTypeDefineByDcode_preScanning(void){
 			default:break;
 		}
 	}
-	
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RELAY_BOX)
+
+	switch(val_dcode_Local){
+		case DEV_RELAY_DCODE_FLGVAL_FUNC_A:
+				currentDev_typeSet(devTypeDef_relayBox_1bit, false);
+				break;
+		case DEV_RELAY_DCODE_FLGVAL_FUNC_B:
+				currentDev_typeSet(devTypeDef_relayBox_curtain, false);
+				break;
+		default:break;
+	}
 #endif
 }
 
@@ -778,7 +950,9 @@ void devMechanicalOpreatPeriphInit(void){
 	io_conf.pull_up_en 	 = 1;
 #elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_SOCKET)
 
-	io_conf.pin_bit_mask = (1ULL << DEV_SOCKET_USR_KEY_PIN);
+	io_conf.pin_bit_mask = (1ULL << DEV_SOCKET_USR_KEY_PIN)			|\
+						   (1ULL << DEV_SOCKET_USR_DEVDEF_PIN_C0)	|\
+						   (1ULL << DEV_SOCKET_USR_DEVDEF_PIN_C1);
 	io_conf.pull_down_en = 0;
 	io_conf.pull_up_en 	 = 1;
 #elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_INDEP_MOUDLE)
@@ -793,6 +967,33 @@ void devMechanicalOpreatPeriphInit(void){
 						   (1ULL << DEV_MOUDLE_DCODE_4_PIN)  |\
 						   (1ULL << DEV_MOUDLE_DCODE_5_PIN)  |\
 						   (1ULL << DEV_MOUDLE_DCODE_6_PIN);
+	io_conf.pull_down_en = 0;
+	io_conf.pull_up_en 	 = 1;
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RELAY_BOX)
+
+	io_conf.pin_bit_mask = (1ULL << DEV_RELAY_USR_KEY_PIN) |\
+						   (1ULL << DEV_RELAY_USR_DEVDEF_PIN_C0);
+	io_conf.pull_down_en = 0;
+	io_conf.pull_up_en   = 1;
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RGBLAMP_BELT) ||\
+	 (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RGBLAMP_BULB)
+
+	io_conf.pin_bit_mask = (1ULL << DEV_RGBLAMP_USR_KEY_PIN);
+	io_conf.pull_down_en = 0;
+	io_conf.pull_up_en 	 = 1;
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_GAS_DETECTOR)
+
+	io_conf.pin_bit_mask = (1ULL << DEV_GAS_DETECTOR_USR_KEY_PIN);
+	io_conf.pull_down_en = 1;
+	io_conf.pull_up_en 	 = 0;
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_SMOKE_DETECTOR)
+
+	io_conf.pin_bit_mask = (1ULL << DEV_SMOKE_DETECTOR_USR_KEY_PIN);
+	io_conf.pull_down_en = 1;
+	io_conf.pull_up_en 	 = 0;
+#elif(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_PIR_DETECTOR)
+
+	io_conf.pin_bit_mask = (1ULL << DEV_PIR_DETECTOR_USR_KEY_PIN);
 	io_conf.pull_down_en = 0;
 	io_conf.pull_up_en 	 = 1;
 #endif

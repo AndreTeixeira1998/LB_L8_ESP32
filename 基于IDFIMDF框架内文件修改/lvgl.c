@@ -19,8 +19,15 @@
 /* LVGL includes */
 #include "iot_lvgl.h"
 
+/* LanbonL8 bussiness */
+#include "devDataManage.h"
+
 // wait for execute lv_task_handler and lv_tick_inc to avoid some widget don't refresh.
 #define LVGL_INIT_DELAY 100 // unit ms
+
+extern SemaphoreHandle_t xSph_lvglOpreat;
+
+static TimerHandle_t timerHld_lvglTaskTimer = NULL;
 
 static void lv_tick_timercb(void *timer)
 {
@@ -34,7 +41,22 @@ static void lv_task_timercb(void *timer)
 {
     /* Periodically call this function.
      * The timing is not critical but should be between 1..10 ms */
+
+	xSemaphoreTake(xSph_lvglOpreat, portMAX_DELAY); // --lvgl[take up]
     lv_task_handler();
+	xSemaphoreGive(xSph_lvglOpreat); // --lvgl[realse]
+}
+
+static void lv_task_funCb_usrOverride(void *param){
+
+	for(;;){
+
+		xSemaphoreTake(xSph_lvglOpreat, portMAX_DELAY); // --lvgl[take up]
+		lv_task_handler();
+		vTaskDelay(5 / portTICK_PERIOD_MS);
+		xSemaphoreGive(xSph_lvglOpreat); // --lvgl[realse]
+		vTaskDelay(3 / portTICK_PERIOD_MS);
+	}
 }
 
 void lvgl_init()
@@ -45,6 +67,8 @@ void lvgl_init()
     /* Initialize LittlevGL */
     lv_init();
 
+	xSph_lvglOpreat = xSemaphoreCreateMutex();
+
     esp_timer_create_args_t timer_conf = {
         .callback = lv_tick_timercb,
         .name     = "lv_tick_timer"
@@ -52,7 +76,6 @@ void lvgl_init()
 
     esp_timer_handle_t g_wifi_connect_timer = NULL;
     esp_timer_create(&timer_conf, &g_wifi_connect_timer);
-
     esp_timer_start_periodic(g_wifi_connect_timer, 1 * 1000U);
 
     /* Display interface */
@@ -68,18 +91,40 @@ void lvgl_init()
         .name     = "lv_task_timer"
     };
 
-    esp_timer_handle_t lv_task_timer = NULL;
-    esp_timer_create(&lv_task_timer_conf, &lv_task_timer);
+//    esp_timer_handle_t lv_task_timer = NULL;
+//    esp_timer_create(&lv_task_timer_conf, &lv_task_timer);
+//    esp_timer_start_periodic(lv_task_timer, 5 * 1000U);
 
-    esp_timer_start_periodic(lv_task_timer, 5 * 1000U);
+	xTaskCreate(lv_task_funCb_usrOverride, //Task Function
+				"lvTask",   //Task Name
+				1024 * 6,	//Stack Depth
+				NULL,		//Parameters
+				CONFIG_MDF_TASK_DEFAULT_PRIOTY,			 //Priority  
+				NULL);		 //Task Handler
 
     vTaskDelay(LVGL_INIT_DELAY / portTICK_PERIOD_MS);    // wait for execute lv_task_handler and lv_tick_inc to avoid some widget don't refresh.
 
 #ifdef CONFIG_LVGL_DRIVER_TOUCH_SCREEN_ENABLE
 
-	extern bool usrApp_devIptdrv_paramRecalibration_get(void);
+	extern enum_touchCaliRsv usrApp_devIptdrv_paramRecalibration_get(void);
+	enum_touchCaliRsv touchCaliStatus = usrApp_devIptdrv_paramRecalibration_get();
+	bool touchCaliRsv = false;
+	
+	if(touchCaliStatus == caliStatus_noCfm){
 
-    /* Calibrate touch screen */
-    lvgl_calibrate_mouse(indevdrv, usrApp_devIptdrv_paramRecalibration_get());
+		usrApp_lvgl_calibration_fakeDataSave(indevdrv);
+		usrApp_devIptdrv_paramRecalibration_set(false);
+//		touchCaliRsv = true;
+	}
+	else
+	{
+		if(touchCaliStatus == caliStatus_Y){
+
+			touchCaliRsv = true;
+		}
+	}
+
+    /* Calibrate touch screen */ 
+    lvgl_calibrate_mouse(indevdrv, touchCaliRsv);
 #endif
 }

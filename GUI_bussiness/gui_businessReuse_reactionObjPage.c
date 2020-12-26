@@ -3,15 +3,6 @@
  *********************/
 #include <stdio.h>
 
-// /* freertos includes */
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/timers.h"
-#include "freertos/semphr.h"
-#include "freertos/queue.h"
-#include "freertos/event_groups.h"
-#include "esp_freertos_hooks.h"
-
 #include "sdkconfig.h"
 
 /* lvgl includes */
@@ -24,9 +15,11 @@
 LV_FONT_DECLARE(lv_font_consola_17);
 LV_FONT_DECLARE(lv_font_consola_19);
 
-extern const char *btnm_str_devHeater[DEVICE_HEATER_OPREAT_ACTION_NUM + 1];
 extern const char *btnm_str_devFans[DEVICE_FANS_OPREAT_ACTION_NUM + 1];
 const char *btnm_str_devScenario[DEVSCENARIO_OPREATION_OBJ_NUM + 1] =  {"A", "B", "C", ""};
+
+static const char *btnm_str_devHeater_ref[DEVICE_HEATER_OPREAT_ACTION_NUM + 1] = {"X", "A", "B", "C", "D", ""};
+static const char *btnm_str_devHeater_mask[DEVICE_HEATER_OPREAT_ACTION_NUM + 1] = {"Off", "On", "30min", "60min", "Custom", ""};
 
 static uint8_t devDimmer_pageSet_brightnessOpreat_div = 0;
 static uint8_t devCurtain_pageSet_positionOpreat_div = 0;
@@ -40,7 +33,7 @@ static lv_obj_t	*pageDetailSet_switchReaction_labelBtnmRef = NULL;
 
 static char strTemp_labelObjRef[20] = {0};
 
-static lv_style_t styleLabelRef_pageDetailSet;
+static lv_style_t *styleLabelRef_pageDetailSet = NULL;
 
 static stt_devDataPonitTypedef deviceDataPoint_valSetTemp[PAGEREACTION_REUSE_GLOBAL_NUM] = {0};
 static uint8_t currentDataPoint_valSetTemp_insert = 0;
@@ -65,6 +58,7 @@ static lv_res_t sw1FunCb_trigAction_switchReaction_valSet(lv_obj_t *sw){
 
 	switch(currentDev_typeGet()){
 
+		case devTypeDef_largeCurOneBit:
 		case devTypeDef_mulitSwOneBit:{
 
 			(lv_sw_get_state(sw))?
@@ -310,7 +304,7 @@ static lv_res_t btnmFunCb_clickAction_switchReaction_valSet(lv_obj_t *btnm, cons
 
 			case devTypeDef_heater:{
 
-				btnmStrCmp_temp = btnm_str_devHeater; 
+				btnmStrCmp_temp = btnm_str_devHeater_ref; 
 				loopCmp_maxNum = DEVICE_HEATER_OPREAT_ACTION_NUM + 1;
 			
 			}break;
@@ -360,7 +354,7 @@ static lv_res_t btnmFunCb_clickAction_switchReaction_valSet(lv_obj_t *btnm, cons
 
 			deviceDataPoint_valSetTemp[currentDataPoint_valSetTemp_insert].devType_heater.devHeater_swEnumVal = toggleNum;	
 			
-			sprintf(strTemp_labelObjRef, "gear: %s", btnm_str_devHeater[deviceDataPoint_valSetTemp[currentDataPoint_valSetTemp_insert].devType_heater.devHeater_swEnumVal]);
+			sprintf(strTemp_labelObjRef, "gear: %s", btnm_str_devHeater_mask[deviceDataPoint_valSetTemp[currentDataPoint_valSetTemp_insert].devType_heater.devHeater_swEnumVal]);
 			lv_label_set_text(pageDetailSet_switchReaction_labelBtnmRef, strTemp_labelObjRef);
 			lv_obj_refresh_style(pageDetailSet_switchReaction_labelBtnmRef);
 
@@ -377,9 +371,11 @@ static lv_res_t btnmFunCb_clickAction_switchReaction_valSet(lv_obj_t *btnm, cons
 
 void lvGui_businessReuse_objStyle_Init(void){
 
-	lv_style_copy(&styleLabelRef_pageDetailSet, &lv_style_plain);
-	styleLabelRef_pageDetailSet.text.font = &lv_font_consola_17;
-	styleLabelRef_pageDetailSet.text.color = LV_COLOR_BLACK;
+	if(NULL == styleLabelRef_pageDetailSet)styleLabelRef_pageDetailSet = (lv_style_t *)LV_MEM_CUSTOM_ALLOC(sizeof(lv_style_t));
+
+	lv_style_copy(styleLabelRef_pageDetailSet, &lv_style_plain);
+	styleLabelRef_pageDetailSet->text.font = &lv_font_consola_17;
+	styleLabelRef_pageDetailSet->text.color = LV_COLOR_BLACK;
 }
 
 void lvGui_businessReuse_reactionObjPageElement_creat(lv_obj_t *obj_Parent, uint8_t pageObjIst, lv_coord_t cy, stt_devDataPonitTypedef *cfgDataCurrent){
@@ -437,10 +433,11 @@ void lvGui_businessReuse_reactionObjPageElement_creat(lv_obj_t *obj_Parent, uint
 
 	switch(currentDev_typeGet()){
 
+		case devTypeDef_largeCurOneBit:
 		case devTypeDef_mulitSwOneBit:{
 
 			pageDetailSet_switchReaction_labelSwRef[0] = lv_label_create(obj_Parent, NULL);
-			lv_label_set_style(pageDetailSet_switchReaction_labelSwRef[0], &styleLabelRef_pageDetailSet);
+			lv_label_set_style(pageDetailSet_switchReaction_labelSwRef[0], styleLabelRef_pageDetailSet);
 			lv_label_set_text(pageDetailSet_switchReaction_labelSwRef[0], "switch_A: ");
 			lv_obj_set_protect(pageDetailSet_switchReaction_labelSwRef[0], LV_PROTECT_POS);
 			lv_obj_align(pageDetailSet_switchReaction_labelSwRef[0], obj_Parent, LV_ALIGN_IN_TOP_LEFT, objPosOfs_x, cy + 30);
@@ -448,7 +445,7 @@ void lvGui_businessReuse_reactionObjPageElement_creat(lv_obj_t *obj_Parent, uint
 			pageDetailSet_switchReaction_sw[0] = lv_sw_create(obj_Parent, NULL);
 			lv_sw_set_action(pageDetailSet_switchReaction_sw[0], sw1FunCb_trigAction_switchReaction_valSet);
 			lv_obj_set_protect(pageDetailSet_switchReaction_sw[0], LV_PROTECT_POS);
-			lv_obj_align(pageDetailSet_switchReaction_sw[0], pageDetailSet_switchReaction_labelSwRef[0], LV_ALIGN_OUT_RIGHT_MID, 5, 0);
+			lv_obj_align(pageDetailSet_switchReaction_sw[0], pageDetailSet_switchReaction_labelSwRef[0], LV_ALIGN_OUT_RIGHT_MID, 5, 5);
 			lv_obj_set_free_num(pageDetailSet_switchReaction_sw[0], pageObjIst);
 			lv_obj_set_size(pageDetailSet_switchReaction_sw[0], objSize_switchReaction_sw[0], objSize_switchReaction_sw[1]);
 
@@ -461,7 +458,7 @@ void lvGui_businessReuse_reactionObjPageElement_creat(lv_obj_t *obj_Parent, uint
 		case devTypeDef_mulitSwTwoBit:{
 
 			pageDetailSet_switchReaction_labelSwRef[0] = lv_label_create(obj_Parent, NULL);
-			lv_label_set_style(pageDetailSet_switchReaction_labelSwRef[0], &styleLabelRef_pageDetailSet);
+			lv_label_set_style(pageDetailSet_switchReaction_labelSwRef[0], styleLabelRef_pageDetailSet);
 			lv_label_set_text(pageDetailSet_switchReaction_labelSwRef[0], "switch_A: ");
 			lv_obj_set_protect(pageDetailSet_switchReaction_labelSwRef[0], LV_PROTECT_POS);
 			lv_obj_align(pageDetailSet_switchReaction_labelSwRef[0], obj_Parent, LV_ALIGN_IN_TOP_LEFT, objPosOfs_x, cy + 15);
@@ -492,7 +489,7 @@ void lvGui_businessReuse_reactionObjPageElement_creat(lv_obj_t *obj_Parent, uint
 		case devTypeDef_mulitSwThreeBit:{
 
 			pageDetailSet_switchReaction_labelSwRef[0] = lv_label_create(obj_Parent, NULL);
-			lv_label_set_style(pageDetailSet_switchReaction_labelSwRef[0], &styleLabelRef_pageDetailSet);
+			lv_label_set_style(pageDetailSet_switchReaction_labelSwRef[0], styleLabelRef_pageDetailSet);
 			lv_label_set_text(pageDetailSet_switchReaction_labelSwRef[0], "switch_A: ");
 			lv_obj_set_protect(pageDetailSet_switchReaction_labelSwRef[0], LV_PROTECT_POS);
 			lv_obj_align(pageDetailSet_switchReaction_labelSwRef[0], obj_Parent, LV_ALIGN_IN_TOP_LEFT, objPosOfs_x, cy);
@@ -537,7 +534,7 @@ void lvGui_businessReuse_reactionObjPageElement_creat(lv_obj_t *obj_Parent, uint
 		case devTypeDef_thermostat:{
 
 			pageDetailSet_switchReaction_labelSwRef[0] = lv_label_create(obj_Parent, NULL);
-			lv_label_set_style(pageDetailSet_switchReaction_labelSwRef[0], &styleLabelRef_pageDetailSet);
+			lv_label_set_style(pageDetailSet_switchReaction_labelSwRef[0], styleLabelRef_pageDetailSet);
 			lv_label_set_text(pageDetailSet_switchReaction_labelSwRef[0], "thermostat open: ");
 			lv_obj_set_protect(pageDetailSet_switchReaction_labelSwRef[0], LV_PROTECT_POS);
 			lv_obj_align(pageDetailSet_switchReaction_labelSwRef[0], obj_Parent, LV_ALIGN_IN_TOP_LEFT, objPosOfs_x, cy);
@@ -560,7 +557,7 @@ void lvGui_businessReuse_reactionObjPageElement_creat(lv_obj_t *obj_Parent, uint
 			uint8_t devParamSet_temp = 0;
 		
 			pageDetailSet_switchReaction_labelSwRef[0] = lv_label_create(obj_Parent, NULL);
-			lv_label_set_style(pageDetailSet_switchReaction_labelSwRef[0], &styleLabelRef_pageDetailSet);
+			lv_label_set_style(pageDetailSet_switchReaction_labelSwRef[0], styleLabelRef_pageDetailSet);
 			lv_label_set_text(pageDetailSet_switchReaction_labelSwRef[0], "device run: ");
 			lv_obj_set_protect(pageDetailSet_switchReaction_labelSwRef[0], LV_PROTECT_POS);
 			lv_obj_align(pageDetailSet_switchReaction_labelSwRef[0], obj_Parent, LV_ALIGN_IN_TOP_LEFT, objPosOfs_x, cy);
@@ -629,7 +626,7 @@ void lvGui_businessReuse_reactionObjPageElement_creat(lv_obj_t *obj_Parent, uint
 			}
 
 			pageDetailSet_switchReaction_labelSliderRef = lv_label_create(obj_Parent, NULL);
-			lv_label_set_style(pageDetailSet_switchReaction_labelSliderRef, &styleLabelRef_pageDetailSet);
+			lv_label_set_style(pageDetailSet_switchReaction_labelSliderRef, styleLabelRef_pageDetailSet);
 			sprintf(strTemp_labelObjRef, "brightness(%d%%):", brightnessLabelDisp_Temp);
 			lv_label_set_text(pageDetailSet_switchReaction_labelSliderRef, strTemp_labelObjRef);
 			lv_obj_set_protect(pageDetailSet_switchReaction_labelSliderRef, LV_PROTECT_POS);
@@ -676,7 +673,7 @@ void lvGui_businessReuse_reactionObjPageElement_creat(lv_obj_t *obj_Parent, uint
 			}
 
 			pageDetailSet_switchReaction_labelSliderRef = lv_label_create(obj_Parent, NULL);
-			lv_label_set_style(pageDetailSet_switchReaction_labelSliderRef, &styleLabelRef_pageDetailSet);
+			lv_label_set_style(pageDetailSet_switchReaction_labelSliderRef, styleLabelRef_pageDetailSet);
 			sprintf(strTemp_labelObjRef, "position(%d%%):", positionLabelDisp_Temp);
 			lv_label_set_text(pageDetailSet_switchReaction_labelSliderRef, strTemp_labelObjRef);
 			lv_obj_set_protect(pageDetailSet_switchReaction_labelSliderRef, LV_PROTECT_POS);
@@ -697,7 +694,7 @@ void lvGui_businessReuse_reactionObjPageElement_creat(lv_obj_t *obj_Parent, uint
 		case devTypeDef_fans:{
 
 			pageDetailSet_switchReaction_labelBtnmRef = lv_label_create(obj_Parent, NULL);
-			lv_label_set_style(pageDetailSet_switchReaction_labelBtnmRef, &styleLabelRef_pageDetailSet);
+			lv_label_set_style(pageDetailSet_switchReaction_labelBtnmRef, styleLabelRef_pageDetailSet);
 			sprintf(strTemp_labelObjRef, "gear: %s", btnm_str_devFans[deviceDataPoint_valSetTemp[pageObjIst_local].devType_fans.devFans_swEnumVal]);
 			lv_label_set_text(pageDetailSet_switchReaction_labelBtnmRef, strTemp_labelObjRef);
 			lv_obj_set_protect(pageDetailSet_switchReaction_labelBtnmRef, LV_PROTECT_POS);
@@ -720,7 +717,7 @@ void lvGui_businessReuse_reactionObjPageElement_creat(lv_obj_t *obj_Parent, uint
 			uint8_t scenarioIstDisp_Temp = devDriverBussiness_scnarioSwitch_swVal2Insert(deviceDataPoint_valSetTemp[pageObjIst_local].devType_scenario.devScenario_opNum);
 
 			pageDetailSet_switchReaction_labelBtnmRef = lv_label_create(obj_Parent, NULL);
-			lv_label_set_style(pageDetailSet_switchReaction_labelBtnmRef, &styleLabelRef_pageDetailSet);
+			lv_label_set_style(pageDetailSet_switchReaction_labelBtnmRef, styleLabelRef_pageDetailSet);
 			sprintf(strTemp_labelObjRef, "scenario: %s", btnm_str_devScenario[scenarioIstDisp_Temp - 1]);
 			lv_label_set_text(pageDetailSet_switchReaction_labelBtnmRef, strTemp_labelObjRef);
 			lv_obj_set_protect(pageDetailSet_switchReaction_labelBtnmRef, LV_PROTECT_POS);
@@ -741,8 +738,8 @@ void lvGui_businessReuse_reactionObjPageElement_creat(lv_obj_t *obj_Parent, uint
 		case devTypeDef_heater:{
 
 			pageDetailSet_switchReaction_labelBtnmRef = lv_label_create(obj_Parent, NULL);
-			lv_label_set_style(pageDetailSet_switchReaction_labelBtnmRef, &styleLabelRef_pageDetailSet);
-			sprintf(strTemp_labelObjRef, "gear: %s", btnm_str_devHeater[deviceDataPoint_valSetTemp[pageObjIst_local].devType_heater.devHeater_swEnumVal]);
+			lv_label_set_style(pageDetailSet_switchReaction_labelBtnmRef, styleLabelRef_pageDetailSet);
+			sprintf(strTemp_labelObjRef, "gear: %s", btnm_str_devHeater_mask[deviceDataPoint_valSetTemp[pageObjIst_local].devType_heater.devHeater_swEnumVal]);
 			lv_label_set_text(pageDetailSet_switchReaction_labelBtnmRef, strTemp_labelObjRef);
 			lv_obj_set_protect(pageDetailSet_switchReaction_labelBtnmRef, LV_PROTECT_POS);
 			lv_obj_align(pageDetailSet_switchReaction_labelBtnmRef, obj_Parent, LV_ALIGN_IN_TOP_LEFT, objPosOfs_x - 10, cy + 10);
@@ -752,7 +749,7 @@ void lvGui_businessReuse_reactionObjPageElement_creat(lv_obj_t *obj_Parent, uint
 			lv_obj_set_protect(pageDetailSet_switchReaction_btnm, LV_PROTECT_POS);
 			lv_obj_align(pageDetailSet_switchReaction_btnm, pageDetailSet_switchReaction_labelBtnmRef, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 15);
 			lv_btnm_set_action(pageDetailSet_switchReaction_btnm, btnmFunCb_clickAction_switchReaction_valSet);
-			lv_btnm_set_map(pageDetailSet_switchReaction_btnm, btnm_str_devHeater);
+			lv_btnm_set_map(pageDetailSet_switchReaction_btnm, btnm_str_devHeater_ref);
 			lv_obj_set_free_num(pageDetailSet_switchReaction_btnm, pageObjIst);
 
 			lv_btnm_set_toggle(pageDetailSet_switchReaction_btnm, true, deviceDataPoint_valSetTemp[pageObjIst_local].devType_heater.devHeater_swEnumVal);

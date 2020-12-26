@@ -80,6 +80,7 @@ enum blufi_data_type {
     BLUFI_DATA_MESH_PASSWORD         = 5,
     BLUFI_DATA_MESH_TYPE             = 6,
     BLUFI_DATA_DEV_TIMEZONE			 = 7,
+    BLUFI_DATA_DEV_SERVER_IP		 = 8,
 
     /**
      * @brief mwifi network configuration
@@ -106,6 +107,14 @@ enum blufi_data_type {
     BLUFI_DATA_XON_QSIZE             = 35,
     BLUFI_DATA_RETRANSMIT_ENABLE     = 36,
     BLUFI_DATA_DROP_ENABLE           = 37,
+
+    /**
+     * @brief L8 switch device param configuration
+     */
+    BLUFI_DATA_L8_SW_INFO_GET		 = 47,
+	BLUFI_DATA_L8_SW_STATE_SET		 = 48,
+	BLUFI_DATA_L8_SW_ICON_SET		 = 49,
+	BLUFI_DATA_L8_SW_NAME_SET		 = 50,
 
     /**
      * @brief Device whitelist
@@ -331,7 +340,6 @@ static mdf_err_t blufi_wifi_event_handler(void *ctx, system_event_t *event)
             esp_blufi_send_wifi_conn_report(WIFI_MODE_STA, ESP_BLUFI_STA_CONN_SUCCESS, 0, NULL);
 
             {
-		
 				stt_blufiConfigDevInfo_resp *blufiConfig_infoDataResp = devBlufiConfig_respInfoGet();
 				printf("wifi config complete notice ret:%d.\n", esp_blufi_send_custom_data((uint8_t *)blufiConfig_infoDataResp, sizeof(stt_blufiConfigDevInfo_resp)));
 				free(blufiConfig_infoDataResp);
@@ -579,11 +587,18 @@ static void mconfig_blufi_event_callback(esp_blufi_cb_event_t event, esp_blufi_c
         case ESP_BLUFI_EVENT_RECV_USERNAME:
         case ESP_BLUFI_EVENT_RECV_CUSTOM_DATA: {
 
+			struct stt_flgGatheWifiCfg{
+
+				uint8_t flg_ssid:1;
+				uint8_t flg_psd:1;
+				uint8_t flg_bssid:1;
+			}wifiCfgParamFlg = {0};
+
 //			printf("ble data send ret:%d.\n", esp_blufi_send_custom_data((uint8_t *)"Hellow Lanbon.", 14)); //收到用户数据时发送，在本case break之前
 
             MDF_LOGV("param->custom_data.data_len: %d, param->custom_data.data: %s",
                      param->custom_data.data_len, param->custom_data.data);
-            MDF_ERROR_BREAK(param->custom_data.data_len < 6,
+            MDF_ERROR_BREAK(param->custom_data.data_len < 3,
                             "param->custom_data.data_len: %d", param->custom_data.data_len);
 
             mconfig_ble_connect_timer_delete();
@@ -628,18 +643,21 @@ static void mconfig_blufi_event_callback(esp_blufi_cb_event_t event, esp_blufi_c
                         memcpy(g_recv_config->config.router_ssid, blufi_data->data, blufi_data->len);
 //						printf("Router ssid: %s\n", g_recv_config->config.router_ssid);
                         MDF_LOGI("Router ssid: %s", g_recv_config->config.router_ssid);
+						wifiCfgParamFlg.flg_ssid = 1;
                         break;
 
                     case BLUFI_DATA_ROUTER_PASSWORD:
                         memcpy(g_recv_config->config.router_password, blufi_data->data, blufi_data->len);
 //						printf("Router password: %s\n", g_recv_config->config.router_password);
                         MDF_LOGI("Router password: %s", g_recv_config->config.router_password);
+						wifiCfgParamFlg.flg_psd = 1;
                         break;
 
                     case BLUFI_DATA_ROUTER_BSSID:
                         memcpy(g_recv_config->config.router_bssid, blufi_data->data, blufi_data->len);
 						devRouterConnectBssid_Set(blufi_data->data, true);
                         MDF_LOGI("Router bssid: " MACSTR, MAC2STR(g_recv_config->config.router_bssid));
+						wifiCfgParamFlg.flg_bssid = 1;
                         break;
 
                     case BLUFI_DATA_MESH_ID:
@@ -665,6 +683,75 @@ static void mconfig_blufi_event_callback(esp_blufi_cb_event_t event, esp_blufi_c
 							MDF_LOGI("Time zone: H-%d, M-%d.", blufi_data->data[0], blufi_data->data[1]);
 							
 						}break;
+
+					case BLUFI_DATA_DEV_SERVER_IP:{
+
+							stt_mqttCfgParam dtMqttParamTemp = {
+							
+								.host_domain = MQTT_REMOTE_DATATRANS_PARAM_HOST_DEF,
+								.port_remote = MQTT_REMOTE_DATATRANS_PARAM_PORT_DEF,
+							};
+
+							//自身IP等信息修改
+							memcpy(&dtMqttParamTemp, blufi_data->data, blufi_data->len);
+							dtMqttParamTemp.port_remote  = ((uint16_t)(blufi_data->data[MQTT_HOST_DOMAIN_STRLEN + 0]) << 8) & 0xff00;
+							dtMqttParamTemp.port_remote |= ((uint16_t)(blufi_data->data[MQTT_HOST_DOMAIN_STRLEN + 1]) << 0) & 0x00ff;
+							mqttRemoteConnectCfg_paramSet(&dtMqttParamTemp, true);
+//							printf("Len:%d, [96]:%02X, [97]:%02X.\n", blufi_data->len, blufi_data->data[96], blufi_data->data[97]);
+							printf("mqtt server nvsData chg, IP:%s-port:%d.\n", dtMqttParamTemp.host_domain,
+																			   	dtMqttParamTemp.port_remote);
+							
+						}break;
+
+					case BLUFI_DATA_L8_SW_STATE_SET:{
+
+						stt_devDataPonitTypedef dataVal_set = {0};
+						
+						memcpy(&dataVal_set, (uint8_t *)(&blufi_data->data[0]), sizeof(uint8_t));
+						currentDev_dataPointSet(&dataVal_set, true, true, true, false, false);
+
+					}break;
+					
+					case BLUFI_DATA_L8_SW_ICON_SET:{
+
+						usrAppHomepageBtnIconNumDisp_paramSet(blufi_data->data, true);
+
+					}break;
+					
+					case BLUFI_DATA_L8_SW_NAME_SET:{
+
+						const uint8_t *dataRcv_kernel = &blufi_data->data[0];
+						
+						uint8_t dataChg_temp[GUI_BUSSINESS_HOME_BTNTEXT_STR_UTF8_SIZE] = {0};
+						char countryAbbreTemp[DATAMANAGE_LANGUAGE_ABBRE_MAXLEN] = {0};
+						uint8_t cyFlg_temp = 0;
+						uint8_t objNum =  dataRcv_kernel[6];
+						uint8_t textDataLen = dataRcv_kernel[7];
+						const uint8_t dataTextCodeIstStart = 8;
+						
+						memcpy(countryAbbreTemp, &(dataRcv_kernel[0]), sizeof(char) * DATAMANAGE_LANGUAGE_ABBRE_MAXLEN);
+						cyFlg_temp = countryFlgGetByAbbre(countryAbbreTemp);
+						memcpy(dataChg_temp, &(dataRcv_kernel[dataTextCodeIstStart]), textDataLen);
+						
+						usrAppHomepageBtnTextDisp_paramSet_specified(objNum, dataChg_temp, textDataLen, cyFlg_temp, true);
+
+					}break;
+
+					case BLUFI_DATA_L8_SW_INFO_GET:{
+
+						const uint8_t *dataRcv_kernel = &blufi_data->data[0];
+						switch(dataRcv_kernel[0]){
+
+							case 0x01:{ //普通状态查询
+
+								stt_blufiConfigDevInfo_resp *blufiConfig_infoDataResp = devBlufiConfig_respInfoGet();
+								printf("blufi sw info get respond res:%d.\n", esp_blufi_send_custom_data((uint8_t *)blufiConfig_infoDataResp, sizeof(stt_blufiConfigDevInfo_resp)));
+								free(blufiConfig_infoDataResp);
+
+							}break;
+						}
+
+					}break;
 						
                     case BLUFI_DATA_VOTE_PERCENTAGE:
                         memcpy(&g_recv_config->init_config.vote_percentage, blufi_data->data, blufi_data->len);
@@ -805,37 +892,41 @@ static void mconfig_blufi_event_callback(esp_blufi_cb_event_t event, esp_blufi_c
                 }
             }
 
-			meshNetwork_connectReserve_IF_set(true); //连接尝试，配置提示信息更新
-			devBeepTips_trig(3, 10, 150, 0, 1);
+			if(wifiCfgParamFlg.flg_ssid & wifiCfgParamFlg.flg_psd & wifiCfgParamFlg.flg_bssid){ //指定参数都被设置时才会触发网络连接
 
-            mconfig_chain_slave_channel_switch_disable();
+				meshNetwork_connectReserve_IF_set(true); //连接尝试，配置提示信息更新
+				devBeepTips_trig(3, 10, 150, 0, 1);
 
-            wifi_config_t sta_config = {0};
-			stt_routerCfgInfo routerCfgInfo_temp = {0};
+	            mconfig_chain_slave_channel_switch_disable();
 
-			//路由器配置信息本地记录
-			memcpy(routerCfgInfo_temp.routerInfo_ssid, g_recv_config->config.router_ssid, sizeof(uint8_t) * 32);
-			memcpy(routerCfgInfo_temp.routerInfo_psd, g_recv_config->config.router_password, sizeof(uint8_t) * 64);
-			currentRouterCfgInfo_paramSet(&routerCfgInfo_temp, true);
+	            wifi_config_t sta_config = {0};
+				stt_routerCfgInfo routerCfgInfo_temp = {0};
 
-            memcpy(sta_config.sta.ssid, g_recv_config->config.router_ssid, strlen(g_recv_config->config.router_ssid));
-            memcpy(sta_config.sta.bssid, g_recv_config->config.router_bssid, sizeof(g_recv_config->config.router_bssid));
-            memcpy(sta_config.sta.password, g_recv_config->config.router_password, strlen(g_recv_config->config.router_password));
-			memcpy(g_recv_config->config.mesh_password, meshPsd_default, strlen(meshPsd_default));
+				//路由器配置信息本地记录
+				memcpy(routerCfgInfo_temp.routerInfo_ssid, g_recv_config->config.router_ssid, sizeof(uint8_t) * 32);
+				memcpy(routerCfgInfo_temp.routerInfo_psd, g_recv_config->config.router_password, sizeof(uint8_t) * 64);
+				currentRouterCfgInfo_paramSet(&routerCfgInfo_temp, true);
 
-			lvGui_usrAppBussinessRunning_block(0, "wifi\nconnecting...", 30); //UI阻塞提示，wifi连接中
+	            memcpy(sta_config.sta.ssid, g_recv_config->config.router_ssid, strlen(g_recv_config->config.router_ssid));
+	            memcpy(sta_config.sta.bssid, g_recv_config->config.router_bssid, sizeof(g_recv_config->config.router_bssid));
+	            memcpy(sta_config.sta.password, g_recv_config->config.router_password, strlen(g_recv_config->config.router_password));
+				memcpy(g_recv_config->config.mesh_password, meshPsd_default, strlen(meshPsd_default));
 
-            ret = esp_wifi_set_config(WIFI_IF_STA, &sta_config);
-            MDF_ERROR_BREAK(ret != ESP_OK, "<%s> Set the configuration of the ESP32 STA", mdf_err_to_name(ret));
+//				lvGui_usrAppBussinessRunning_block(0, "wifi\nconnecting...", 30); //UI阻塞提示，wifi连接中
+				lvGui_usrAppBussinessRunning_block(0, labelStrGet_bySysLanguage(tls_wifiConnecting), 30);
 
-            esp_event_loop_set_cb(blufi_wifi_event_handler, NULL);
+	            ret = esp_wifi_set_config(WIFI_IF_STA, &sta_config);
+	            MDF_ERROR_BREAK(ret != ESP_OK, "<%s> Set the configuration of the ESP32 STA", mdf_err_to_name(ret));
 
-            ret = esp_wifi_connect();
-            MDF_ERROR_BREAK(ret != ESP_OK, "<%s> Connect the ESP32 WiFi station to the AP", mdf_err_to_name(ret));
+	            esp_event_loop_set_cb(blufi_wifi_event_handler, NULL);
 
-            ret = mdf_event_loop_send(MDF_EVENT_MCONFIG_BLUFI_STA_CONNECTED, NULL);
-            MDF_ERROR_BREAK(ret < 0, "<%s> Send the event to the event handler", mdf_err_to_name(ret));
+	            ret = esp_wifi_connect();
+	            MDF_ERROR_BREAK(ret != ESP_OK, "<%s> Connect the ESP32 WiFi station to the AP", mdf_err_to_name(ret));
 
+	            ret = mdf_event_loop_send(MDF_EVENT_MCONFIG_BLUFI_STA_CONNECTED, NULL);
+	            MDF_ERROR_BREAK(ret < 0, "<%s> Send the event to the event handler", mdf_err_to_name(ret));
+			}
+			
             break;
         }
 
@@ -858,7 +949,8 @@ void mconfig_blufi_completeInadvice_byKBoard(char ssid[32], char psd[64], uint8_
 	const mwifi_init_config_t init_config = MWIFI_INIT_CONFIG_DEFAULT();
 	memcpy(&sta_config, &init_config, sizeof(mwifi_init_config_t));
 
-	lvGui_usrAppBussinessRunning_block(0, "wifi\nconnecting...", 30); //UI阻塞提示，wifi连接中
+//	lvGui_usrAppBussinessRunning_block(0, "wifi\nconnecting...", 30); //UI阻塞提示，wifi连接中
+	lvGui_usrAppBussinessRunning_block(0, labelStrGet_bySysLanguage(tls_wifiConnecting), 30);
 
 	devRouterConnectBssid_Set(bssid, true);
 

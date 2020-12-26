@@ -34,11 +34,14 @@
 /* uGFX Config Include */
 #include "sdkconfig.h"
 
+/* usrApp Include */
+#include "devDriver_manage.h"
+
 class CEspLcdAdapter : public CEspLcd
 {
 public:
     const uint16_t *pFrameBuffer = NULL;
-    CEspLcdAdapter(lcd_conf_t *lcd_conf, int height = LCD_TFTHEIGHT, int width = LCD_TFTWIDTH, bool dma_en = true, int dma_word_size = 1024, int dma_chan = 1) : CEspLcd(lcd_conf, height, width, dma_en, dma_word_size, dma_chan)
+    CEspLcdAdapter(lcd_conf_t *lcd_conf, int height = LCD_TFTHEIGHT, int width = LCD_TFTWIDTH, bool dma_en = true, int dma_word_size = 512, int dma_chan = 1) : CEspLcd(lcd_conf, height, width, dma_en, dma_word_size, dma_chan)
     {
         /* Code here*/
     }
@@ -238,6 +241,10 @@ void externSocket_ex_disp_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, l
 
 lv_disp_drv_t lvgl_lcd_display_init()
 {
+	stt_devStatusRecord devStatusParam_temp = {0};
+
+	devStatusRecordIF_paramGet(&devStatusParam_temp);
+
     /*Initialize LCD*/
     lcd_conf_t lcd_pins = {
         .lcd_model = LCD_MOD_AUTO_DET,
@@ -256,15 +263,27 @@ lv_disp_drv_t lvgl_lcd_display_init()
     };
 
     if (lcd_obj == NULL) {
-        lcd_obj = new CEspLcdAdapter(&lcd_pins, LV_VER_RES, LV_HOR_RES);
+
+		(devStatusParam_temp.devScreenLandscape_IF)?
+			(lcd_obj = new CEspLcdAdapter(&lcd_pins, 240, 320)):
+			(lcd_obj = new CEspLcdAdapter(&lcd_pins, 320, 240));
     }
 
     lv_disp_drv_t disp_drv;      /*Descriptor of a display driver*/
     lv_disp_drv_init(&disp_drv); /*Basic initialization*/
 
 #ifdef CONFIG_LVGL_DISP_ROTATE_0
-    board_lcd_write_cmd(ILI9341_MEMACCESS_REG);
-    board_lcd_write_data_byte(0x80 | 0x08);
+
+	if(devStatusParam_temp.devScreenLandscape_IF){ //横屏？
+
+	    board_lcd_write_cmd(ILI9341_MEMACCESS_REG);
+	    board_lcd_write_data_byte(0x20 | 0x08);
+	}
+	else
+	{
+		board_lcd_write_cmd(ILI9341_MEMACCESS_REG);
+		board_lcd_write_data_byte(0x80 | 0x08);
+	}
     ESP_LOGI("lvgl_example", "CONFIG_LVGL_DISP_ROTATE_0");
 #elif defined(CONFIG_LVGL_DISP_ROTATE_90)
     board_lcd_write_cmd(ILI9341_MEMACCESS_REG);

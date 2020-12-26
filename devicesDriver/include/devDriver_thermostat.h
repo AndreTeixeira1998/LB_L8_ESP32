@@ -26,12 +26,29 @@ extern "C" {
 
 #define DEVICE_THERMOSTAT_TEMPTARGET_DEFAULT			16	 //默认起始温度
 
+#define DEVICE_THERMOSTAT_OPREAT_ACTION_NUM				4	 //恒温器总共有几个档
+
 /**********************
  *      TYPEDEFS
  **********************/
-typedef struct{
+#if(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_THERMO_INDP_A)
+ typedef enum{
+	
+	thermostatRunningStatus_mode_stop = 0,
+	thermostatRunningStatus_mode_heat,
+	thermostatRunningStatus_mode_cool,
+	thermostatRunningStatus_mode_auto,
+	
+ }stt_devThermostat_runningStatus;
+#endif
 
-	uint16_t deviceRunning_EN:1;
+typedef struct{
+#if(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_THERMO_INDP_A)
+	uint16_t deviceRunning_MODE:2;
+	uint16_t deviceExSwstatus_fans:1;
+#else
+	uint16_t deviceRunning_EN:1;	
+#endif
 	uint16_t workModeInNight_IF:1;
 	uint16_t temperatureVal_target:6;
 	uint16_t temperatureVal_current:6;
@@ -66,6 +83,11 @@ void devDriverBussiness_thermostatSwitch_exSwitchParamSet(uint8_t param);
 uint8_t devDriverBussiness_thermostatSwitch_exSwitchParamGet(void);
 uint8_t devDriverBussiness_thermostatSwitch_exSwitchRcdParamGet(void);
 uint8_t devDriverBussiness_thermostatSwitch_exSwitchParamGetWithRcd(void);
+
+#if(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_THERMO_INDP_A)
+void devDriverBussiness_thermostatSwitch_devParam_runMode_set(stt_devThermostat_runningStatus workMode);
+void devDriverBussiness_thermostatSwitch_devParam_exFansState_set(bool openIf);
+#endif
 
 #ifdef __cplusplus
 } /* extern "C" */

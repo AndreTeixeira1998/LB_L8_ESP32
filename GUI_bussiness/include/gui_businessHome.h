@@ -15,6 +15,8 @@ extern "C" {
  *********************/
 #include "iot_lvgl.h"
 
+#include "devDataManage.h"
+
 /*********************
  *      DEFINES
  *********************/
@@ -32,6 +34,8 @@ extern "C" {
 /**********************
  *      TYPEDEFS
  **********************/
+typedef void (* funcPtr_lvUsrGuiSwitchPreAction)(void);
+
 typedef enum{
 
 	bussinessType_null = 0,
@@ -86,6 +90,21 @@ enum{
 	bGroudImg_objInsert_pureColor7,
 };
 
+typedef struct{
+
+	devTypeDef_enum devType;
+
+	union _unn_ctrlObjChgParam{
+
+		struct _sttData_hpCtrlObjWithDevDimmer{
+
+			uint8_t objChg_brightness;
+		}ctrlObjDataDev_Dimmer;
+
+	}msgData_ctrlObjParam;
+
+}stt_msgDats_uiHpDevCtrlObjValChg;
+
 /**********************
  * GLOBAL PROTOTYPES
  **********************/
@@ -98,14 +117,14 @@ extern bool volatile task_guiSwitch_Detecting_runningFlg;
  * @param th pointer to a theme
  */
 void lvGui_businessInit(void);
-void lvGui_usrSwitch(usrGuiBussiness_type guiPage);
+void lvGui_usrSwitch_withPrefunc(usrGuiBussiness_type guiPage, funcPtr_lvUsrGuiSwitchPreAction func);
 
 lv_style_t *usrAppHomepageBkPicStyle_prevDataGet(uint8_t ist);
 lv_img_dsc_t *usrAppHomepageBkPic_prevDataGet(uint8_t ist);
 
 void pageHome_buttonMain_imageRefresh(bool freshNoRecord);
 
-void usrAppHomepageThemeType_Set(const uint8_t themeType_flg, bool nvsRecord_IF);
+void usrAppHomepageThemeType_Set(const uint8_t themeType_flg, bool recommendBpic_if, bool nvsRecord_IF);
 uint8_t usrAppHomepageThemeType_Get(void);
 
 void usrAppHomepageBgroundPicOrg_Set(const uint8_t picIst, bool nvsRecord_IF, bool refresh_IF);
@@ -118,6 +137,7 @@ void lvGui_tipsFullScreen_generate(const char *strTips, uint16_t timeOut);
 void lvGui_tipsFullScreen_generateAutoTime(const char *strTips);
 void lvGui_tipsFullScreen_distruction(void);
 
+void lvglUsrApp_touchDisTrig(uint16_t timeDelay, uint16_t timeKeep);
 void usrApp_fullScreenRefresh_self(uint16_t freshTime, lv_coord_t y);
 
 #ifdef __cplusplus

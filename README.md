@@ -1,20 +1,17 @@
-# Light Bulb
+# L8_series switch
 
-## Overview
-This is a smart light example that you can run on ESP SMART LIGHT or [ESP32-DevKitC V4](https://esp-idf.readthedocs.io/en/latest/hw-reference/modules-and-boards.html#esp32-devkitc-v4).
+## 概述
+本项目基于espressif MDF
 
-## Output Pin
-| Pin         | GND  | IO4  | IO16  | IO5  | IO19              | IO23       |
-| :---------- | :--- | :--- | :---  | :--- | :---------------- | :--------- |
-| Description | GND  | Red  | Green | Blue | Color Temperature | Brightness |
+## 引脚图
 
-## Device Status:
-* Network Configuration: Blinking Yellow
-* Networking: Blinking Green
-* Upgrade: Blinking Blue
-* Exceptions: Blinking Red
 
-## Related Links
-* Compiling: [ESP-MDF Get Started](https://docs.espressif.com/projects/esp-mdf/en/latest/get-started/index.html)
-* App: [ESP-Mesh App for Android](https://www.espressif.com/zh-hans/support/download/apps?keys=&field_technology_tid%5B%5D=18)
-* Protocol: [Mlink](https://docs.espressif.com/projects/esp-mdf/en/latest/api-guides/mlink.html)
+## 流程图
+![image](https://github.com/Nepenthes/LB_L8_ESP32/blob/master/programFlowMap/L8程序流程_基本通信.jpg)
+![image](https://github.com/Nepenthes/LB_L8_ESP32/blob/master/programFlowMap/L8程序流程_初始化.jpg)
+![image](https://github.com/Nepenthes/LB_L8_ESP32/blob/master/programFlowMap/L8程序流程_根节点数据发送.jpg)
+![image](https://github.com/Nepenthes/LB_L8_ESP32/blob/master/programFlowMap/L8程序流程_根节点数据接收.jpg)
+![image](https://github.com/Nepenthes/LB_L8_ESP32/blob/master/programFlowMap/L8程序流程_节点数据接收.jpg)
+![image](https://github.com/Nepenthes/LB_L8_ESP32/blob/master/programFlowMap/L8程序流程_节点数据处理.jpg)
+![image](https://github.com/Nepenthes/LB_L8_ESP32/blob/master/programFlowMap/HMI业务.jpg)
+![image](https://github.com/Nepenthes/LB_L8_ESP32/blob/master/programFlowMap/L8程序流程_执行机构驱动业务.jpg)

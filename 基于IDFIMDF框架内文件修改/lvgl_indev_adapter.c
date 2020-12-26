@@ -78,6 +78,7 @@ static uint16_t read_word(uint8_t reg)
 /*Function pointer to read data. Return 'true' if there is still data to be read (buffered)*/
 static bool ex_tp_read(lv_indev_data_t *data)
 {
+	stt_devStatusRecord devStatusParam_temp = {0};
 	uint8_t touchPointNum = 0;
 	uint8_t touch_gestrue = 0;
     static lv_coord_t x = 0xFFFF, y = 0xFFFF;
@@ -125,18 +126,29 @@ static bool ex_tp_read(lv_indev_data_t *data)
 				lv_coord_t t;
 				// Rescale X,Y if we are using self-calibration
 #ifdef CONFIG_LVGL_DISP_ROTATE_0
-					data->point.x = LV_HOR_RES - 1 - data->point.x;
-					data->point.y = LV_VER_RES - 1 - data->point.y;
+
+					devStatusRecordIF_paramGet(&devStatusParam_temp);
+					if(devStatusParam_temp.devScreenLandscape_IF){ //横屏？
+					
+						t = data->point.y;
+						data->point.y = 240 - 1 - data->point.x; //为了不修改所有文件的宏，强制将尺寸改为320 * 320，触摸修正手改
+						data->point.x = t;
+					}
+					else
+					{
+						data->point.x = 240 - 1 - data->point.x; //为了不修改所有文件的宏，强制将尺寸改为320 * 320，触摸修正手改
+						data->point.y = L8_DEV_SCREEN_SIZE_VER - 1 - data->point.y;
+					}
 #elif defined(CONFIG_LVGL_DISP_ROTATE_90)
 					t = data->point.x;
-					data->point.x = LV_HOR_RES - 1 - data->point.y;
+					data->point.x = L8_DEV_SCREEN_SIZE_HOR - 1 - data->point.y;
 					data->point.y = t;
 #elif defined(CONFIG_LVGL_DISP_ROTATE_180)
-					data->point.x = LV_HOR_RES - 1 - data->point.x;
-					data->point.y = LV_VER_RES - 1 - data->point.y;
+					data->point.x = L8_DEV_SCREEN_SIZE_HOR - 1 - data->point.x;
+					data->point.y = L8_DEV_SCREEN_SIZE_VER - 1 - data->point.y;
 #elif defined(CONFIG_LVGL_DISP_ROTATE_270)
 					t = data->point.y;
-					data->point.y = LV_VER_RES - 1 - data->point.x;
+					data->point.y = L8_DEV_SCREEN_SIZE_VER - 1 - data->point.x;
 					data->point.x = t;
 #endif
 				x = data->point.x;
@@ -147,8 +159,8 @@ static bool ex_tp_read(lv_indev_data_t *data)
 //				x = data->point.x;
 //				y = data->point.y;
 //			
-				data->point.x = LV_HOR_RES - 1 - data->point.x;
-				data->point.y = LV_VER_RES - 1 - data->point.y;
+				data->point.x = L8_DEV_SCREEN_SIZE_HOR - 1 - data->point.x;
+				data->point.y = L8_DEV_SCREEN_SIZE_VER - 1 - data->point.y;
 			}
 
 			//自定义手势解析 -业务保留，逻辑触发失能
@@ -274,18 +286,18 @@ static bool ex_tp_read(lv_indev_data_t *data)
 //				lv_coord_t t;
 //				// Rescale X,Y if we are using self-calibration
 //#ifdef defined(CONFIG_LVGL_DISP_ROTATE_0)
-//				data->point.x = LV_HOR_RES - 1 - data->point.x;
-//				data->point.y = LV_VER_RES - 1 - data->point.y;
+//				data->point.x = L8_DEV_SCREEN_SIZE_HOR - 1 - data->point.x;
+//				data->point.y = L8_DEV_SCREEN_SIZE_VER - 1 - data->point.y;
 //#elif defined(CONFIG_LVGL_DISP_ROTATE_90)
 //				t = data->point.y;
-//				data->point.y = LV_VER_RES - 1 - data->point.x;
+//				data->point.y = L8_DEV_SCREEN_SIZE_VER - 1 - data->point.x;
 //				data->point.x = t;
 //#elif CONFIG_LVGL_DISP_ROTATE_180
 //				data->point.x = data->point.x;
 //				data->point.y = data->point.y;
 //#elif defined(CONFIG_LVGL_DISP_ROTATE_270)
 //				t = data->point.x;
-//				data->point.x = LV_HOR_RES - 1 - data->point.y;
+//				data->point.x = L8_DEV_SCREEN_SIZE_HOR - 1 - data->point.y;
 //				data->point.y = t;
 //#endif
 //				x = data->point.x;
@@ -313,7 +325,7 @@ lv_indev_drv_t lvgl_indev_init()
         .sda_pullup_en = GPIO_PULLUP_ENABLE,
         .scl_io_num = CONFIG_LVGL_TOUCH_SCL_GPIO,
         .scl_pullup_en = GPIO_PULLUP_ENABLE,
-        .master.clk_speed = 200000,
+        .master.clk_speed = 10000,
     };
     i2c_bus = iot_i2c_bus_create(CONFIG_LVGL_TOUCH_IIC_NUM, &conf);
     dev = iot_ft5x06_create(i2c_bus, FT5X06_ADDR_DEF);

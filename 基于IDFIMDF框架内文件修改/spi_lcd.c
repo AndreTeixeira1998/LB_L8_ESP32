@@ -129,8 +129,17 @@ void lcd_data(spi_device_handle_t spi, const uint8_t *data, int len, lcd_dc_t *d
         .tx_buffer = data,              // Data
         .user = (void *) dc,            // D/C needs to be set to 1
     };
+
+//	do{
+
+//		ret = _lcd_spi_send(spi, &t);
+
+//	}while(ret != ESP_OK);
+	
     ret = _lcd_spi_send(spi, &t);       // Transmit!
-    assert(ret == ESP_OK);              // Should have had no issues.
+    if(ESP_OK != ret)
+		printf(">>>lcd spi send err:%d!!!\n", ret);
+//    assert(ret == ESP_OK);              // Should have had no issues.
 }
 
 uint32_t lcd_init(lcd_conf_t* lcd_conf, spi_device_handle_t *spi_wr_dev, lcd_dc_t *dc, int dma_chan)

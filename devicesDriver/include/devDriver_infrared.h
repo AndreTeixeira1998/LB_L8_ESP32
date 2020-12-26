@@ -24,6 +24,8 @@ extern "C" {
  *********************/
 #define DEVINFRARED_RUNNINGDETECT_PERIODLOOP_TIME		   0.001F
 
+#define DEVINFRARED_HXD019D_IR_CMD_QUEUE_LEN_MAX		   6
+
 #define DEVINFRARED_HXD019D_opsLearnningSTBY_TOUT		   2000    //
 #define DEVINFRARED_HXD019D_opsLearnningSTBY_TOUTLOOP	   3	   //
 #define DEVINFRARED_HXD019D_opsLearnning_TOUT			   20000   //
@@ -60,10 +62,14 @@ uint8_t devDriverBussiness_infraredSwitch_currentOpreatNumGet(void);
 
 void devDriverBussiness_infraredSwitch_timerUpTrigIstTabSet(uint8_t istTab[USRAPP_VALDEFINE_TRIGTIMER_NUM], bool nvsRecord_IF);
 void devDriverBussiness_infraredSwitch_timerUpTrigIstTabGet(uint8_t istTab[USRAPP_VALDEFINE_TRIGTIMER_NUM]);
+void infraredOpreatActRemoteControlCmdLineUp(uint8_t cmdIndex);
 
 void devDriverBussiness_infraredSwitch_moudleInit(void);
 void devDriverBussiness_infraredSwitch_moudleDeinit(void);
 void devDriverBussiness_infraredSwitch_periphStatusReales(stt_devDataPonitTypedef *param);
+
+float devDriverBussiness_tempMeasureByDs18b20_get(void);
+void devDriverBussiness_tempMeasureByDs18b20_getByHex(stt_devTempParam2Hex *param);
 
 #ifdef __cplusplus
 } /* extern "C" */

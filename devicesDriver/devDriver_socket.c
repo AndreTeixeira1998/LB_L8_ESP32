@@ -1,14 +1,5 @@
 #include "devDriver_socket.h"
 
-/* freertos includes */
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/timers.h"
-#include "freertos/semphr.h"
-#include "freertos/queue.h"
-#include "freertos/event_groups.h"
-#include "esp_freertos_hooks.h"
-
 #include "devDriver_manage.h"
 
 #define DEVDRIVER_SOCKET_GPIO_OUTPUT_IO_RLY	   		27

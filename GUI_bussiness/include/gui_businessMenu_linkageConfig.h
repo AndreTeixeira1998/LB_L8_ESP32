@@ -13,7 +13,11 @@ extern "C" {
 /*********************
  *      INCLUDES
  *********************/
-#include "iot_lvgl.h"
+#include "devDataManage.h"
+
+#include "mlink.h"
+#include "mwifi.h"
+#include "mdf_common.h"
 
 /*********************
  *      DEFINES
@@ -34,6 +38,14 @@ extern "C" {
 void lvGui_businessMenu_linkageConfig(lv_obj_t * obj_Parent);
 
 void guiDispTimeOut_pageLinkageCfg(void);
+
+void dataTransBussiness_pageLinkageCfg_superCtrlActivityFunction(void);
+void dataTransBussiness_pageLinkageCfg_superSycnActivityFunction(void);
+
+void lvGuiLinkageConfig_devGraphCtrlBlock_listNodeUnitRefresh(uint8_t devMac[MWIFI_ADDR_LEN], uint8_t devState);
+void lvGuiLinkageConfig_devGraphCtrlBlock_listLoadInitialization(stt_nodeObj_listManageDevCtrlBase *devNodeListHead, lv_obj_t *obj_Parent, bool dispCb_if);
+void lvGuiLinkageConfig_devGraphCtrlBlock_listLoadPrePage(lv_obj_t * obj_Parent);
+void lvGuiLinkageConfig_devGraphCtrlBlock_listLoadFlg_set(bool flg);
 
 #ifdef __cplusplus
 } /* extern "C" */

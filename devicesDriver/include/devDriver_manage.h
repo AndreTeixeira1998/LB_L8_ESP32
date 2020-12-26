@@ -31,6 +31,12 @@ extern "C" {
 #include "devDriver_infraActDetect.h"
 #include "devDriver_infrared.h"
 #include "devDriver_socket.h"
+#include "devDriver_solarSysManager.h"
+#include "devDriver_rgbLamp.h"
+#include "devDriver_gasDetector.h"
+#include "devDriver_smokeDetector.h"
+#include "devDriver_pirDetector.h"
+#include "devDriver_uartMoudle.h"
 
 /*********************
  *      DEFINES
@@ -56,20 +62,20 @@ extern "C" {
 
 	   typedef struct _stt_relayMagTestParam{
 	   
-			   stt_RMTest_pRcd dataRcd;
-	   
-			   const uint16_t relayActPeriod; //翻转保持周期
-			   uint16_t relayActCounter; //翻转计数
-			   
-			   uint16_t relayStatus_actFlg:3; //动作状态
-			   uint16_t relayTest_EN:1; //测试开始/停止
+		   stt_RMTest_pRcd dataRcd;
+   
+		   const uint16_t relayActPeriod; //翻转保持周期
+		   uint16_t relayActCounter; //翻转计数
+		   
+		   uint16_t relayStatus_actFlg:3; //动作状态
+		   uint16_t relayTest_EN:1; //测试开始/停止
 	   }stt_relayMagTestParam;
   #endif
 #else
   
 #endif
 
-#define DEVICE_TYPE_LIST_NUM					10
+#define DEVICE_TYPE_LIST_NUM					12
 #define HOMEPAGE_THEMETYPE_NUM					3
 
 /**********************
@@ -79,18 +85,26 @@ extern "C" {
 /**********************
  * GLOBAL PROTOTYPES
  **********************/
-void currentDev_dataPointRecovery(stt_devDataPonitTypedef *param);
 uint8_t deviceTypeVersionJudge(uint8_t devType);
 bool deviceFistRunningJudge_get(void);
 devTypeDef_enum IRAM_ATTR currentDev_typeGet(void);
 void currentDev_typeSet(devTypeDef_enum devType, bool nvsRecord_IF);
 void devStatusRecordIF_paramSet(stt_devStatusRecord *param, bool nvsRecord_IF);
 void devStatusRecordIF_paramGet(stt_devStatusRecord *param);
+void devSystemKeyAttr_paramSet(stt_devSystemKeyParamRecord *param, bool nvsRecord_IF);
+void devSystemKeyAttr_paramGet(stt_devSystemKeyParamRecord *param);
 void deviceDatapointSynchronousReport_actionTrig(void);
+void currentDev_dataPointRecovery(stt_devDataPonitTypedef *parambool, 
+															  bool nvsRecord_IF, 
+															  bool mutualCtrlTrig_IF, 
+															  bool statusUploadMedthod,
+															  bool synchronousReport_IF,
+															  bool syncMeshSuper_IF);
 void devDriverParamChg_dataRealesTrig(bool nvsRecord_IF, 
 										  	   bool mutualCtrlTrig_IF, 
 										  	   bool statusUploadMedthod,
-										  	   bool synchronousReport_IF);
+										  	   bool synchronousReport_IF,
+										  	   bool syncMeshSuper_IF);
 void currentDev_dataPointGet(stt_devDataPonitTypedef *param);
 void currentDev_dataPointRcdGet(stt_devDataPonitTypedef *param);
 void currentDev_dataPointGetwithRecord(stt_devDataPonitTypedef *param);
@@ -98,9 +112,11 @@ void currentDev_dataPointSet(stt_devDataPonitTypedef *param,
 													   bool nvsRecord_IF, 
 													   bool mutualCtrlTrig_IF, 
 													   bool statusUploadMedthod, 
-													   bool synchronousReport_IF);
+													   bool synchronousReport_IF,
+													   bool syncMeshSuper_IF);
 void currentDev_extParamSet(void *param);
 void currentDev_extParamGet(uint8_t paramTemp[DEVPARAMEXT_DT_LEN]);
+void currentDev_extParamGet_x(uint8_t paramTemp[DEVPARAMEXT_DT_LEN], uint8_t datsType);
 void devDriverApp_responseAtionTrig_delay(void);
 void funcation_usrAppMutualCtrlActionTrig(void);
 void devDriverManageBussiness_initialition(void);
@@ -109,6 +125,12 @@ void devDriverManageBussiness_deviceChangeRefresh(void);
 bool devStatusDispMethod_landscapeIf_get(void);
 
 void isrHandleFuncPcntUnit_regster(void (*funcHandle)(uint32_t evtStatus), uint8_t funcIst);
+
+#if(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_GAS_DETECTOR)||\
+   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_SMOKE_DETECTOR)||\
+   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_PIR_DETECTOR)
+ void currentDev_detectingReportDataGet(stt_devDetectingDataDef *param);
+#endif
 
 #if(DEVICE_DRIVER_DEFINITION == DEVICE_DRIVER_METHOD_BY_SLAVE_MCU)
 

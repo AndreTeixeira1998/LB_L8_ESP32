@@ -1,13 +1,5 @@
 #include "devDriver_elecMeasure.h"
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/queue.h"
-#include "freertos/task.h"
-#include "freertos/timers.h"
-#include "freertos/semphr.h"
-#include "freertos/event_groups.h"
-#include "esp_freertos_hooks.h"
-
 #include "driver/periph_ctrl.h"
 #include "driver/gpio.h"
 #include "driver/pcnt.h"
@@ -43,6 +35,20 @@ static void IRAM_ATTR pcnt_isr_handler(uint32_t evtStatus){
 
 void devDriverBussiness_elecMeasure_paramProcess(void){ //调用周期:DEVDRIVER_ELECMEASURE_PARAM_PROCESS_PERIOD s
 
+#if(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_SOLAR_SYS_MANAGER) ||\
+   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RGBLAMP_BELT) ||\
+   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RGBLAMP_BULB)
+	
+	return; //没有电量检测业务
+
+#else
+
+ #if(LVAPP_DISP_ELECPARAM_HIDDEN_EN == 1)
+	return;
+ #endif
+
+#endif
+
 	stt_localTime timeNow = {0};
 	const float processPeriod_paramTemp = DEVDRIVER_ELECMEASURE_PARAM_PROCESS_PERIOD;
 	static stt_timerLoop_ext paramElecSumSave = {(120 / (uint16_t)processPeriod_paramTemp), 0};
@@ -51,7 +57,7 @@ void devDriverBussiness_elecMeasure_paramProcess(void){ //调用周期:DEVDRIVER
 
 	if(0 == timeNow.time_Minute){
 
-		if(devParam_ElecDetect.ele_Consum > 1.0F)devParam_ElecDetect.ele_Consum = 0.0F;
+		if(devParam_ElecDetect.ele_Consum > 0.0001F)devParam_ElecDetect.ele_Consum = 0.0F; //小时周期电量清理，但保证当前分钟内的最小电量计量（0.0001kWh）
 	}
 
 	if(paramElecSumSave.loopCounter < paramElecSumSave.loopPeriod)paramElecSumSave.loopCounter ++;
@@ -65,14 +71,25 @@ void devDriverBussiness_elecMeasure_paramProcess(void){ //调用周期:DEVDRIVER
 
 float devDriverBussiness_elecMeasure_powerCaculateReales(void){
 
-	int16_t freq_elecMeansure = 0;
-	float   elecSum_calcuTemp = 0.0F;
-
-#if(L8_DEVICE_TYPE_PANEL_DEF != DEV_TYPES_PANEL_DEF_INDEP_HEATER) //热水器电量功能暂隐
-#else
+#if(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_SOLAR_SYS_MANAGER)||\
+   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RGBLAMP_BELT)||\
+   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RGBLAMP_BULB)||\
+   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_GAS_DETECTOR)||\
+   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_SMOKE_DETECTOR)||\
+   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_PIR_DETECTOR)||\
+   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_UART_MOUDLE)
 
 	return 0.0F;
+#else
+
+ #if(LVAPP_DISP_ELECPARAM_HIDDEN_EN == 1)
+	return 0.0F;
+ #endif
+
 #endif
+
+	int16_t freq_elecMeansure = 0;
+	float   elecSum_calcuTemp = 0.0F;
 
 	pcnt_get_counter_value(DEVDRIVER_ELECMEASURE_PCNT_TEST_UNIT, &freq_elecMeansure);
 
@@ -129,12 +146,28 @@ float devDriverBussiness_elecMeasure_valElecConsumGet(void){
 void devDriverBussiness_elecMeasure_valPowerGetByHex(stt_devPowerParam2Hex *param){
 
 	const float decimal_prtCoefficient = 100.0F; //小数计算偏移倍数 --100倍对应十进制两位
+	float dataHandle_temp = 0.0F;
+	uint16_t dataInteger_prt = 0;
+	uint8_t dataDecimal_prt = 0;
 
-	uint16_t dataInteger_prt = (uint16_t)devParam_ElecDetect.eleParam_power & 0xFFFF;
-	uint8_t dataDecimal_prt = (uint8_t)((devParam_ElecDetect.eleParam_power - (float)dataInteger_prt) * decimal_prtCoefficient);
+	switch(currentDev_typeGet()){
+
+#if(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_SOLAR_SYS_MANAGER)
+
+		case devTypeDef_voltageSensor: //电压传感器没有功率，所以数据替换成当前电压数据
+			dataHandle_temp = devDriverBussiness_solarSysManager_voltageCur_get();
+			break;
+#endif
+
+		default: //默认是当前功率数据
+			dataHandle_temp = devParam_ElecDetect.eleParam_power;
+			break;
+	}
+
+	dataInteger_prt = (uint16_t)dataHandle_temp & 0xFFFF;
+	dataDecimal_prt = (uint8_t)((dataHandle_temp - (float)dataInteger_prt) * decimal_prtCoefficient);
 
 	//只可能为正数，不做负数处理
-
 	param->integer_h8bit = (uint8_t)((dataInteger_prt & 0xFF00) >> 8);
 	param->integer_l8bit = (uint8_t)((dataInteger_prt & 0x00FF) >> 0);
 	param->decimal_8bit = dataDecimal_prt;
@@ -213,7 +246,23 @@ static void devDriverBussiness_elecMeasure_pcntInit(void){
 
 void devDriverBussiness_elecMeasure_periphInit(void){
 
+#if(L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_SOLAR_SYS_MANAGER)||\
+   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RGBLAMP_BELT)||\
+   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_RGBLAMP_BULB)||\
+   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_GAS_DETECTOR)||\
+   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_SMOKE_DETECTOR)||\
+   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_PIR_DETECTOR)||\
+   (L8_DEVICE_TYPE_PANEL_DEF == DEV_TYPES_PANEL_DEF_UART_MOUDLE)
+
+	return; //没有电量检测业务
+#else
+
+ #if(LVAPP_DISP_ELECPARAM_HIDDEN_EN == 1)
+	return;
+ #endif
+
 	devDriverBussiness_elecMeasure_pcntInit();
+#endif
 }
 
 
